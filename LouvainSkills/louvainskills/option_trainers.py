@@ -249,6 +249,7 @@ class BetweennessOptionTrainer(OptionTrainer):
         initiation_set = set(initiation_set)
 
         time_steps = 0
+        episodes = 0
         while time_steps < self.max_steps:
             # Choose (non-terminal!) state in the initiation set.
             state = next(
@@ -303,7 +304,7 @@ class BetweennessOptionTrainer(OptionTrainer):
 
             # Check to see whether the episode limit has been reached.
             episodes += 1
-            if episodes > self.max_episode_limit:
+            if episodes > self.max_num_episodes:
                 break
 
         # For Debugging - adds policy labels to the STG.
