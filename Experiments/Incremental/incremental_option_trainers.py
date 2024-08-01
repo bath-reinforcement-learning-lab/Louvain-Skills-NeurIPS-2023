@@ -135,9 +135,9 @@ class IncrementalLouvainOptionTrainer(OptionTrainer):
         for state in initiation_set:
             if not ((state is None) or (self.env.is_state_terminal(state))):
                 selected_option = self._select_option(state, test=True)
-                self.stg.nodes[state][
-                    f"{hierarchy_level},{source_cluster},{target_cluster}"
-                ] = self._get_primitive_option(state, selected_option).action
+                self.stg.nodes[state][f"{hierarchy_level},{source_cluster},{target_cluster}"] = (
+                    self._get_primitive_option(state, selected_option).action
+                )
 
         return self.q_table
 
