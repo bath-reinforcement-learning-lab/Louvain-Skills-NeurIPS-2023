@@ -5,22 +5,27 @@ import random
 import numpy as np
 import networkx as nx
 
-from simpleoptions import BaseOption, PrimitiveOption
+from simpleoptions import BaseEnvironment, BaseOption, PrimitiveOption
 
 from collections import defaultdict
+from typing import Dict
 
 
 class EigenOption(BaseOption):
-    def __init__(self, env, stg, pvf, eigenoption_index):
+    def __init__(
+        self,
+        env: BaseEnvironment,
+        stg: nx.Graph,
+        pvf: Dict,
+        eigenoption_index: int,
+    ):
         """
         ASSUMES A DETERMINISTIC ENVIRONMENT.
 
         Args:
             env (`BaseEnvironment`)
-            subgoal (`Hashable`): _description_
             pvf (`dict`): _description_
             eigenoption_index (`int`): _description_
-            q_table (`dict`, optional): _description_. Defaults to None, in which case a defaultdict defaulting to zero is used.
         """
         self.stg = stg
         self.env = copy.copy(env)
@@ -28,7 +33,7 @@ class EigenOption(BaseOption):
         self.eigenoption_index = eigenoption_index
 
         self.primitive_actions = {
-            option.action: option for option in env.options if isinstance(option, PrimitiveOption)
+            option.action: option for option in env.get_option_space() if isinstance(option, PrimitiveOption)
         }
 
     def initiation(self, state):
@@ -78,7 +83,7 @@ class EigenOption(BaseOption):
                         next_state = "EIG_TERMINAL"
                         reward = 0
                     else:
-                        next_state = self.env.get_successors(state, [action])[0]
+                        (next_state, _), _ = self.env.get_successors(state, [action])[0]
                         reward = self._intrinsic_reward(state, next_state)
 
                     if next_state == "EIG_TERMINAL" or self.env.is_state_terminal(next_state):
@@ -107,7 +112,7 @@ class EigenOption(BaseOption):
                         next_state = "EIG_TERMINAL"
                         reward = 0
                     else:
-                        next_state = self.env.get_successors(state, [action])[0]
+                        (next_state, _), _ = self.env.get_successors(state, [action])[0]
                         reward = self._intrinsic_reward(state, next_state)
 
                     if next_state == "EIG_TERMINAL":
