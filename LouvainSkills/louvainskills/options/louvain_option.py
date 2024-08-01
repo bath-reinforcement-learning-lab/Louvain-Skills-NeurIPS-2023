@@ -1,23 +1,19 @@
-import copy
-
-from typing import Hashable
 import networkx as nx
 
-import random
+from typing import Hashable
 
-from simpleoptions import BaseOption, BaseEnvironment
+from simpleoptions import PseudoRewardOption
 
 
-class LouvainOption(BaseOption):
+class LouvainOption(PseudoRewardOption):
     def __init__(
         self,
-        env: "BaseEnvironment",
         stg: nx.DiGraph,
         hierarchy_level: int,
         source_cluster: Hashable,
         target_cluster: Hashable,
         can_leave_initiation_set: bool,
-        q_table: dict = None,
+        policy_dict: dict = None,
     ):
         """
         Initiates a new LouvainOption, which takes an agent from some source clsuter to some target cluster.
@@ -28,9 +24,8 @@ class LouvainOption(BaseOption):
             target_cluster (`Hashable`): The cluster to which the option takes the agent.
             hierarchy_level (`int`): The level of the hierarchy this skill exists at.
             can_leave_initation_set (`bool`): Whether or not the agent can leave the source_cluster while navigating to the target_cluster.
-            q_table (`dict`, optional): _description_. Defaults to None, in which case an empty dictionary is used.
+            policy (`dict`, optional): The dictionary used to represent the option's policy. A mapping from state to Option. Defaults to None, in which case an empty dictionary is used.
         """
-        self.env = copy.copy(env)
         self.stg = stg
         self.hierarchy_level = hierarchy_level
         self.source_cluster = source_cluster
@@ -40,11 +35,13 @@ class LouvainOption(BaseOption):
         self.initiation_set = self._generate_initiation_set()
         if self.can_leave_initiation_set:
             self.executable_set = self._generate_executable_set()
-
-        if q_table is None:
-            self.q_table = {}
         else:
-            self.q_table = q_table
+            self.executable_set = self.initiation_set
+
+        if policy_dict is None:
+            self.policy_dict = {}
+        else:
+            self.policy_dict = policy_dict
 
     def initiation(self, state):
         # If this node has not been yet recorded on the STG, it cannot be in the initiation set.
@@ -55,28 +52,42 @@ class LouvainOption(BaseOption):
             return False
         # Else, test whether this state is in the initiation set.
         else:
-            # return state in self.initiation_set
-            # Pre-computing initiation sets saves a lot of time, but I'm reverting to the code below for now.
-            # It's more expensive, but I need to find a nice way to handle both directed edges and the possibility
-            # for transfer between tasks (a terminal state in one task may not be a terminal state for another,
-            # causing issues when it comes to computing paths etc.).
-            return self.stg.nodes[state][f"cluster-{self.hierarchy_level}"] == self.source_cluster
+            return state in self.initiation_set
 
     def policy(self, state, test=False):
-        # Return highest-valued option from the Q-table, breaking ties randomly.
-        available_options = self.env.get_available_options(state)
-        max_value = max([self.q_table.get((hash(state), hash(option)), 0) for option in available_options])
-
-        chosen_option = random.choice(
-            [option for option in available_options if self.q_table[(hash(state), hash(option))] == max_value]
-        )
-        return chosen_option
+        return self.policy_dict[state]
 
     def termination(self, state):
-        if self.can_leave_initiation_set:
-            return float(self.stg.nodes[state][f"cluster-{self.hierarchy_level}"] == self.target_cluster)
+        if not self.can_leave_initiation_set:
+            return float(state not in self.initiation_set)
         else:
-            return float(not self.initiation(state))
+            return float(state not in self.initiation_set and state not in self.executable_set)
+
+    def pseudo_reward(self, state: Hashable, action: Hashable, next_state: Hashable) -> float:
+        # If the agent is allowed to leave the initation set, it is allowed to reach the target cluster via any node.
+        if self.can_leave_initiation_set:
+            # If the agent is in the set of states from which it can reach the target cluster, it earns a small negative reward of -0.001.
+            if next_state in self.executable_set:
+                return -0.001
+            else:
+                # If the agent has reached the target cluster, it earns a reward of 1.0.
+                if self.stg.nodes[next_state][f"cluster-{self.hierarchy_level}"] == self.target_cluster:
+                    return 1.0
+                # If the agent has left the set of states from which it can reach the target cluster, it earns a large negative reward of -1.0.
+                else:
+                    return -1.0
+        # If the agent is not allowed to leave the initiation set, it has to reach the target cluster via a path that remains in the source cluster.
+        else:
+            # If the agent is in the initiation set, it earns a small negative reward of -0.001.
+            if next_state in self.initiation_set:
+                return -0.001
+            else:
+                # If the agent has reached the target cluster, it earns a reward of 1.0.
+                if self.stg.nodes[next_state][f"cluster-{self.hierarchy_level}"] == self.target_cluster:
+                    return 1.0
+                # Otherwise, it has left the source cluster and entered a non-target cluster, earning a large negative reward of -1.0.
+                else:
+                    return -1.0
 
     def _generate_initiation_set(self):
         # Create sub-graph consisting of only the source cluster and the target cluster.
@@ -92,7 +103,7 @@ class LouvainOption(BaseOption):
         ]
         subgraph = self.stg.subgraph(source_nodes + target_nodes)
 
-        # Return the set of nodes in the starting clsuter from which there exists a path to the
+        # Return the set of nodes in the starting cluster from which there exists a path to the
         # target cluster *without leaving the source cluster*.
         return set(
             [

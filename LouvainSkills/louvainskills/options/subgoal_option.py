@@ -5,35 +5,33 @@ import networkx as nx
 
 import random
 
-from simpleoptions import BaseOption, BaseEnvironment
+from simpleoptions import PseudoRewardOption, BaseEnvironment
 
 
-class SubgoalOption(BaseOption):
+class SubgoalOption(PseudoRewardOption):
     def __init__(
         self,
-        env: "BaseEnvironment",
         stg: nx.DiGraph,
         subgoal: Hashable,
         initiation_set: set,
-        q_table: dict = None,
+        policy_dict: dict = None,
     ):
         """_summary_
 
         Args:
-            stg (`DiGraph`): _description_
-            subgoal (`Hashable`): _description_
-            initiation_set (`set`): _description_
-            q_table (`dict`, optional): _description_. Defaults to None, in which case an empty dictionary is used.
+            stg (`DiGraph`): The state transition graph of the environment.
+            subgoal (`Hashable`): The subgoal state of the option.
+            initiation_set (`set`): The set of states from which the option can be initiated.
+            policy_dict (`dict`, optional): A dictionary of policies for the option. Defaults to None, in which case an empty dictionary is used.
         """
-        self.env = copy.copy(env)
         self.stg = stg
         self.subgoal = subgoal
         self.initiation_set = initiation_set
 
-        if q_table is None:
-            self.q_table = {}
+        if policy_dict is None:
+            self.policy_dict = {}
         else:
-            self.q_table = q_table
+            self.policy_dict = policy_dict
 
     def initiation(self, state):
         # Option can only be initiated from its source cluster.
@@ -41,17 +39,22 @@ class SubgoalOption(BaseOption):
 
     def policy(self, state, test=False):
         # Return highest-valued option from the Q-table, breaking ties randomly.
-        available_options = self.env.get_available_options(state)
-        max_value = max([self.q_table.get((hash(state), hash(option)), 0) for option in available_options])
-
-        chosen_option = random.choice(
-            [option for option in available_options if self.q_table[(hash(state), hash(option))] == max_value]
-        )
-        return chosen_option
+        return self.policy_dict[state]
 
     def termination(self, state):
         # Option terminates upon reaching the subgoal or leaving the initiation set.
         return float((state == self.subgoal) or (state not in self.initiation_set))
+
+    def pseudo_reward(self, state: Hashable, action: Hashable, next_state: Hashable) -> float:
+        # If the next state is the subgoal, the agent earns a reward of 1.0.
+        if next_state == self.subgoal:
+            return 1.0
+        # If the agent has left the initiation set, it earns a large negative reward of -1.0.
+        elif next_state not in self.initiation_set:
+            return -1.0
+        # Otherwise, it is still in the initiation set and earns a small negative reward of -0.001.
+        else:
+            return -0.001
 
     def __str__(self):
         return f"{self.subgoal},{len(self.initiation_set)}"
