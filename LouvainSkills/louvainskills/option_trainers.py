@@ -1,6 +1,8 @@
 import math
 import copy
 import random
+import warnings
+
 import numpy as np
 import igraph as ig
 import networkx as nx
@@ -8,10 +10,11 @@ import networkx as nx
 from itertools import cycle
 from collections import defaultdict
 
-from simpleoptions import PrimitiveOption
-from simpleenvs.envs.playroom import PlayroomEnvironment
+from typing import List, Tuple, Dict, Hashable
+from numbers import Number
 
-from louvainskills.options import LouvainOption
+from simpleoptions import BaseEnvironment, BaseOption, PrimitiveOption, PseudoRewardOption
+from simpleoptions.utils.math import discounted_return
 
 
 class OptionTrainer(object):
@@ -22,308 +25,331 @@ class OptionTrainer(object):
         pass
 
 
-class LouvainOptionTrainer(OptionTrainer):
+class ValueIterationOptionTrainer(OptionTrainer):
     def __init__(
         self,
-        env,
-        stg,
-        epsilon=0.2,
-        alpha=0.4,
-        gamma=1.0,
-        max_steps=100_000,
-        max_episode_steps=250,
-        can_leave_initiation_set=False,
-        max_num_episodes=20_000,
+        env: BaseEnvironment,
+        stg: nx.Graph,
+        gamma: float,
+        theta: float,
+        num_rollouts: int = None,
+        deterministic: bool = False,
     ):
+        """
+        Initialises a new ValueIterationOptionTrainer.
+
+        Args:
+            env (BaseEnvironment): The environment in which the options are to be trained.
+            gamma (float): The discount factor used in the value iteration algorithm.
+            theta (float): The convergence threshold used in the value iteration algorithm.
+            num_rollouts (int, optional): The number of rollouts used to approximate option models. Defaults to None.
+            deterministic (bool, optional): Whether the environment and options are fully deterministic. Defaults to False.
+
+        Raises:
+            ValueError: Raised if num_rollouts is not provided when deterministic is False.
+        """
         self.env = env
         self.stg = stg
-        self.epsilon = epsilon
-        self.alpha = alpha
+        self.theta = theta
         self.gamma = gamma
-        self.max_steps = max_steps
-        self.max_episode_steps = max_episode_steps
-        self.can_leave_initiation_set = can_leave_initiation_set
-        self.max_num_episodes = max_num_episodes
+
+        if num_rollouts is None and not deterministic:
+            raise ValueError("num_rollouts must be provided if deterministic is False.")
+        if deterministic and num_rollouts is not None:
+            warnings.warn("num_rollouts specified but deterministic is True. num_rollouts will be ignored.")
+
+        self.num_rollouts = 1 if deterministic else num_rollouts
 
     def train_option_policy(
-        self, hierarchy_level, source_cluster, target_cluster, q_table=None, default_action_value=0.0
-    ):
-        # Initialise Q-table.
-        if q_table is None:
-            self.q_table = defaultdict(lambda: default_action_value)
+        self,
+        option_to_train: PseudoRewardOption,
+        can_leave_initiation_set: bool,
+    ) -> PseudoRewardOption:
+
+        bottom_level = all([isinstance(option, PrimitiveOption) for option in self.env.get_option_space()])
+
+        if bottom_level:
+            option_to_train.policy_dict = self._primitive_value_iteration(option_to_train, can_leave_initiation_set)
         else:
-            self.q_table = copy.deepcopy(q_table)
+            option_to_train.policy_dict = self._hierarchical_value_iteration(option_to_train, can_leave_initiation_set)
 
-        # Define set of states in the source cluster, where this option can be invoked.
-        initiation_set = [
-            state for state, data in self.stg.nodes(data=True) if data[f"cluster-{hierarchy_level}"] == source_cluster
-        ]
+        return option_to_train
 
-        # Create a cycle over all states in the initiation set that we can sample initial states from when training.
-        initiation_set_cycle = initiation_set * 3
-        random.shuffle(initiation_set_cycle)
-        initiation_set_cycle = cycle(initiation_set_cycle)
+    def _primitive_value_iteration(
+        self,
+        option_to_train: PseudoRewardOption,
+        can_leave_initiation_set: bool,
+    ) -> Dict[Hashable, PrimitiveOption]:
 
-        time_steps = 0
-        episodes = 0
-        while time_steps < self.max_steps:
-            # Choose (non-terminal!) initial state in the source cluster.
-            state = self.env.reset(self._choose_initial_state(initiation_set_cycle))
-            episode_steps = 0
-            terminal = False
+        # Define set of states to learn a policy in.
+        if not can_leave_initiation_set:
+            option_to_train.initiation_set = {
+                state for state in option_to_train.initiation_set if not self.env.is_state_terminal(state)
+            }
+            state_set = option_to_train.initiation_set
 
-            while not terminal:
-                # Select option based on current policy (derived using epsilon-greedy).
-                option = self._select_option(state)
+        else:
+            option_to_train.executable_set = {
+                state for state in option_to_train.executable_set if not self.env.is_state_terminal(state)
+            }
+            state_set = option_to_train.executable_set
 
-                # Run option until termination, tracking visited states and earned rewards.
-                states = [state]
-                rewards = []
-                option_terminated = False
-                while (not option_terminated) and (not terminal):
-                    action = self._get_primitive_option(state, option).policy(state)
-                    next_state, _, done, _ = self.env.step(action)
-                    time_steps += 1
-                    episode_steps += 1
+        # Initialise state value function to zero.
+        state_values = {state: 0 for state in self.env.get_state_space()}
 
-                    # Compute reward and terminality.
-                    if (
-                        self.stg.nodes[next_state][f"cluster-{hierarchy_level}"] == target_cluster
-                    ):  # Agent reaches the target cluster.
-                        reward = 1.0
-                        terminal = True
-                    elif done:  # Agent reaches a terminal state.
-                        reward = -1.0
-                        terminal = True
-                    elif (
-                        (not self.can_leave_initiation_set)
-                        and (self.stg.nodes[next_state][f"cluster-{hierarchy_level}"] != source_cluster)
-                        and (self.stg.nodes[next_state][f"cluster-{hierarchy_level}"] != target_cluster)
-                    ):  # Agent leaves the initiation set (and isn't allowed to do so!).
-                        reward = -1.0
-                        terminal = True
-                    else:  # Otherwise...
-                        reward = -0.001
-                        terminal = False
+        # Loop until the state value function converges upon the optimal state value function.
+        while True:
+            delta = 0
+            for state in state_set:
 
-                    option_terminated = bool(option.termination(next_state))
+                v_curr = state_values[state]
 
-                    states.append(next_state)
-                    rewards.append(reward)
+                next_state_values = []
+                for action in self.env.get_available_actions(state):
+                    successors = self.env.get_successors(state, [action])
+                    next_state_values.append(
+                        sum(
+                            [
+                                trans_prob
+                                * (
+                                    option_to_train.pseudo_reward(state, action, next_state)
+                                    + self.gamma * state_values[next_state]
+                                )
+                                for (next_state, _), trans_prob in successors
+                            ]
+                        )
+                    )
+                state_values[state] = max(next_state_values)
 
-                    state = next_state
+                delta = max(delta, abs(v_curr - state_values[state]))
 
-                    # Training time-limit exceeded.
-                    if (episode_steps > self.max_episode_steps) or (time_steps > self.max_steps):
-                        break
-
-                # Perform a Macro Q-Learning update for each state visited while the option was executing.
-                self._macro_q_learn(states, rewards, option, terminal)
-
-            # Check to see whether the episode limit has been reached.
-            episodes += 1
-            if episodes > self.max_num_episodes:
+            if delta < self.theta:
                 break
+
+        # Output the optimal policy by acting greedily with respect to the learned state value function.
+        policy = {}
+        for state in state_set:
+
+            action_values = {}
+            for action in self.env.get_available_actions(state):
+                successors = self.env.get_successors(state, [action])
+                action_values[action] = sum(
+                    [
+                        trans_prob
+                        * (
+                            option_to_train.pseudo_reward(state, action, next_state)
+                            + self.gamma * state_values[next_state]
+                        )
+                        for (next_state, _), trans_prob in successors
+                    ]
+                )
+            policy[state] = max(action_values, key=action_values.get)
+
+        # Convert policy over primtive actions into a policy over primitive options.
+        primitive_options = {
+            option.action: option for option in self.env.get_option_space() if isinstance(option, PrimitiveOption)
+        }
+        policy = {state: primitive_options[action] for state, action in policy.items()}
 
         # For Debugging - adds policy labels to the STG.
-        for state in initiation_set:
+        for state in state_set:
             if not ((state is None) or (self.env.is_state_terminal(state))):
-                selected_option = self._select_option(state, test=True)
-                self.stg.nodes[state][
-                    f"{hierarchy_level},{source_cluster},{target_cluster}"
-                ] = self._get_primitive_option(state, selected_option).action
+                self.stg.nodes[state][f"{str(option_to_train)}"] = str(policy[state])
 
-        return self.q_table
+        return policy
 
-    def _macro_q_learn(self, states, rewards, option, terminal, n_step=True):
-        termination_state = states[-1]
+    def _hierarchical_value_iteration(
+        self, option_to_train: PseudoRewardOption, can_leave_initiation_set: bool
+    ) -> Dict[Hashable, BaseOption]:
+        # Define set of states to learn a policy in.
+        if not can_leave_initiation_set:
+            option_to_train.initiation_set = {
+                state for state in option_to_train.initiation_set if not self.env.is_state_terminal(state)
+            }
+            state_set = option_to_train.initiation_set
 
-        for i in range(len(states) - 1):
-            initiation_state = states[i]
+        else:
+            option_to_train.executable_set = {
+                state for state in option_to_train.executable_set if not self.env.is_state_terminal(state)
+            }
+            state_set = option_to_train.executable_set
 
-            old_value = self.q_table[(hash(initiation_state), hash(option))]
+        ######################################################################
+        ### STEP 1: Roll-out options in each state to learn option models. ###
+        ######################################################################
 
-            # Compute discounted sum of rewards.
-            discounted_sum_of_rewards = self._discounted_return(rewards[i:], self.gamma)
+        # For each state in state_set, learn a model for each option from the previous level of the hierarchy.
+        option_models: Dict[BaseOption, OptionModel] = {}
+        for initiating_state in state_set:
+            for option in self.env.get_available_options(initiating_state):
+                for _ in range(self.num_rollouts):
+                    # Define a new model for the option if it hasn't been seen before.
+                    if option not in option_models:
+                        option_models[option] = OptionModel()
 
-            # Get Q-Values for Next State.
-            if not terminal:
-                q_values = [
-                    self.q_table[(hash(termination_state), hash(o))]
-                    for o in self.env.get_available_options(termination_state)
-                ]
-            # Cater for terminal states (Q-value is zero).
-            else:
-                q_values = [0]
+                    # Initialise the environment in the given state.
+                    state = self.env.reset(initiating_state)
+                    rewards = []
+                    done = False
+                    k = 0
 
-            # Perform Macro-Q Update
-            self.q_table[(hash(initiation_state), hash(option))] = old_value + self.alpha * (
-                discounted_sum_of_rewards + math.pow(self.gamma, len(rewards) - i) * max(q_values) - old_value
-            )
+                    # Execute the option until either it terminates, the option being trained terminates, or a terminal environment state is reached.
+                    # As you're going along, keep track of the states visited and the rewards earned.
+                    while not done and not option.termination(state) and not option_to_train.termination(state):
+                        action = self._get_primitive_option(state, option.policy(state)).policy(state)
+                        next_state, _, done, _ = self.env.step(action)
+                        reward = option_to_train.pseudo_reward(state, action, next_state)
+                        rewards.append(reward)
+                        state = next_state
+                        k += 1
 
-            # If we're not performing n-step updates, exit after the first iteration.
-            if not n_step:
+                    terminating_state = state
+                    option_models[option].update(
+                        initiating_state, terminating_state, discounted_return(rewards, self.gamma), k
+                    )
+
+        ##########################################################
+        # Step 2: Compute the transition models for each option. #
+        ##########################################################
+        for option in option_models:
+            option_models[option].compute_model()
+
+        #################################################################################################
+        # Step 3: Use the models of lower-level options to learn an policy for the higher-level option. #
+        #################################################################################################
+
+        # Initialise state value function to zero.
+        state_values = {state: 0 for state in self.env.get_state_space()}
+
+        # Loop until the state value function converges upon the optimal state value function.
+        while True:
+            delta = 0
+            for state in state_set:
+
+                v_curr = state_values[state]
+
+                next_state_values = []
+                for option in self.env.get_available_options(state):
+                    successors = option_models[option].possible_outcomes(state)
+                    next_state_values.append(
+                        sum(
+                            [
+                                trans_prob * (disc_return + self.gamma**k * state_values[next_state])
+                                for (next_state, disc_return, k), trans_prob in successors
+                            ]
+                        )
+                    )
+                state_values[state] = max(next_state_values)
+
+                delta = max(delta, abs(v_curr - state_values[state]))
+
+            if delta < self.theta:
                 break
 
-    def _select_option(self, state, test=False):
-        available_options = [option for option in self.env.get_available_options(state)]
+        # Output the optimal policy by acting greedily with respect to the learned state value function.
+        policy: Dict[Hashable, BaseOption] = {}
+        for state in state_set:
+            option_values = {}
+            for option in self.env.get_available_options(state):
+                successors = option_models[option].possible_outcomes(state)
+                option_values[option] = sum(
+                    [
+                        trans_prob * (disc_return + self.gamma**k * state_values[next_state])
+                        for (next_state, disc_return, k), trans_prob in successors
+                    ]
+                )
+            policy[state] = max(option_values, key=option_values.get)
 
-        # Choose an exploratory action with probability epsilon.
-        if (test == False) and (random.random() < self.epsilon):
-            return random.choice(available_options)
-        # Choose the optimal action with probability (1 - epsilon), breaking ties randomly.
-        else:
-            max_value = max([self.q_table[(hash(state), hash(option))] for option in available_options])
-            best_actions = [
-                option for option in available_options if self.q_table[(hash(state), hash(option))] == max_value
-            ]
-            return random.choice(best_actions)
+        # For Debugging - adds policy labels to the STG.
+        for state in state_set:
+            if not ((state is None) or (self.env.is_state_terminal(state))):
+                self.stg.nodes[state][f"{str(option_to_train)}"] = str(policy[state])
 
-    def _choose_initial_state(self, initiation_set_cycle):
-        initial_state = None
+        return policy
 
-        while (initial_state is None) or (self.env.is_state_terminal(initial_state)):
-            initial_state = next(initiation_set_cycle)
-
-        return initial_state
-
-    def _get_primitive_option(self, state, option):
+    def _get_primitive_option(self, state: Hashable, option: BaseOption) -> PrimitiveOption:
         # Recursively query the option policy until we get a primitive option.
         if isinstance(option, PrimitiveOption):
             return option
         else:
             return self._get_primitive_option(state, option.policy(state))
 
-    def _discounted_return(self, rewards, gamma):
-        # Computes the discounted reward given an ordered list of rewards, and a discount factor.
-        num_rewards = len(rewards)
 
-        # Fill an array with gamma^index for index = 0 to index = num_rewards - 1.
-        gamma_exp = np.power(np.full(num_rewards, gamma), np.arange(0, num_rewards))
+class OptionModel(object):
+    def __init__(self):
+        self.observed_transitions = []
+        self.transition_model = {}
+        self.trained = False
+        self.up_to_date = True
 
-        # Element-wise multiply and then sum array.
-        discounted_sum_of_rewards = np.sum(np.multiply(rewards, gamma_exp))
+    def update(self, initiating_state: Hashable, terminating_state: Hashable, disc_return: float, execution_time: int):
+        """
+        Adds a new transition to the set of experiences used to train the model.
 
-        return discounted_sum_of_rewards
+        Args:
+            initiating_state (Hashable): The state in which the option began executing.
+            terminating_state (Hashable): The state in which the option stopped executing.
+            disc_return (float): The discounted return earned by the agent while executing the option.
+            execution_time (int): The number of time steps taken to execute the option.
+        """
+        self.observed_transitions.append((initiating_state, terminating_state, disc_return, execution_time))
+        self.up_to_date = False
 
+    def compute_model(self):
+        """
+        Computes the transition model from the set of observed transitions added using `update`.
+        """
+        # For each initiating state, compute the number of times transitions to each unique (terminating_state, discounted_return) pair occurred.
+        for initiating_state, terminating_state, discounted_return, k in self.observed_transitions:
+            if initiating_state not in self.transition_model:
+                self.transition_model[initiating_state] = {}
+            if (terminating_state, discounted_return, k) not in self.transition_model[initiating_state]:
+                self.transition_model[initiating_state][(terminating_state, discounted_return, k)] = 0
+            self.transition_model[initiating_state][(terminating_state, discounted_return, k)] += 1
 
-class BetweennessOptionTrainer(OptionTrainer):
-    def __init__(
-        self,
-        env,
-        stg,
-        epsilon=0.2,
-        alpha=0.4,
-        gamma=1.0,
-        max_steps=1000,
-        max_episode_steps=200,
-        max_num_episodes=20_000,
-    ):
-        self.env = env
-        self.stg = stg
-        self.epsilon = epsilon
-        self.alpha = alpha
-        self.gamma = gamma
-        self.max_steps = max_steps
-        self.max_episode_steps = max_episode_steps
-        self.max_num_episodes = max_num_episodes
+        # Now, for each initiating state, convert the counts into probabilities.
+        for initiating_state in self.transition_model:
+            total_transitions = sum(self.transition_model[initiating_state].values())
+            for successor in self.transition_model[initiating_state]:
+                self.transition_model[initiating_state][successor] /= float(total_transitions)
 
-    def train_option_policy(self, subgoal, initiation_set_size, q_table=None, default_action_value=0.0):
-        # Initialise Q-table.
-        if q_table is None:
-            self.q_table = defaultdict(lambda: default_action_value)
-        else:
-            self.q_table = copy.deepcopy(q_table)
+        self.trained = True
+        self.up_to_date = True
 
-        # Define initiation set as the n closest nodes that have a path to the
-        # subgoal node, where n = initiation_set_size.
-        initiation_set = sorted(list(nx.single_target_shortest_path_length(self.stg, subgoal)), key=lambda x: x[1])
-        initiation_set = list(list(zip(*initiation_set))[0])[1 : min(initiation_set_size + 1, len(initiation_set) - 1)]
+    def sample(self, initiating_state: Hashable, deterministic: bool = False) -> Tuple[Hashable, float]:
+        """
+        Samples a terminating state and discounted return for the given initiating state.
 
-        # Create a cycle over all states in the initiation set that we can sample initial states from when training.
-        initiation_set_cycle = list(initiation_set) * 5
-        random.shuffle(initiation_set_cycle)
-        initiation_set_cycle = cycle(initiation_set_cycle)
+        Args:
+            initiating_state (Hashable): The state in which the option began executing.
+            deterministic (bool, optional): Whether to sample the most likely terminating state deterministically. Defaults to False.
 
-        # Convert initiation set into a set for faster membership testing.
-        initiation_set = set(initiation_set)
+        Raises:
+            RuntimeError: Rasied if the model has not been trained yet.
 
-        time_steps = 0
-        while time_steps < self.max_steps:
-            # Choose (non-terminal!) state in the initiation set.
-            state = next(
-                self.env.reset(state)
-                for state in initiation_set_cycle
-                if not self.env.is_state_terminal(state) and state != subgoal
+        Returns:
+            Tuple[Hashable, float]: The sampled terminating state and discounted return.
+        """
+
+        if not self.trained:
+            raise RuntimeError(
+                "Model has not been trained yet! Add some transitions using `update`, then call `compute_model` first."
             )
-            episode_steps = 0
-            terminal = False
-
-            while not terminal:
-                # Select and execute action.
-                action = self._select_action(state)
-                next_state, _, done, _ = self.env.step(action.policy(state))
-                time_steps += 1
-                episode_steps += 1
-
-                # Compute reward and terminality.
-                if next_state == subgoal:  # Agent reached subgoal.
-                    reward = 1.0
-                    terminal = True
-                elif next_state not in initiation_set:  # Agent left the initation set.
-                    reward = -1.0
-                    terminal = True
-                elif done:  # Agent reached a terminal state.
-                    reward = -1.0
-                    terminal = True
-                else:  # Otherwise...
-                    reward = -0.001
-                    terminal = False
-
-                # Perform Q-Learning update.
-                old_q = self.q_table[(hash(state), hash(action))]
-                max_next_q = (
-                    0
-                    if terminal
-                    else max(
-                        [
-                            self.q_table[(hash(next_state), hash(next_action))]
-                            for next_action in self.env.get_available_options(next_state)
-                        ]
-                    )
-                )
-                new_q = reward + self.gamma * max_next_q
-                self.q_table[(hash(state), hash(action))] = old_q + self.alpha * (new_q - old_q)
-
-                state = next_state
-
-                # Training time-limit exceeded.
-                if (episode_steps > self.max_episode_steps) or (time_steps > self.max_steps):
-                    break
-
-            # Check to see whether the episode limit has been reached.
-            episodes += 1
-            if episodes > self.max_episode_limit:
-                break
-
-        # For Debugging - adds policy labels to the STG.
-        for state in initiation_set:
-            if not ((state is None) or (self.env.is_state_terminal(state))):
-                selected_option = self._select_action(state, test=True)
-                self.stg.nodes[state][f"{subgoal}"] = selected_option.policy(state)
-
-        return self.q_table, initiation_set
-
-    def _select_action(self, state, test=False):
-        available_options = [option for option in self.env.get_available_options(state)]
-
-        # Choose an exploratory action with probability epsilon.
-        if (not test) and (random.random() < self.epsilon):
-            return random.choice(available_options)
-        # Choose the optimal action with probability (1 - epsilon), breaking ties randomly.
+        # Using the learned model, sample a terminating state and discounted return for the given initiating state.
+        possible_outcomes = self.possible_outcomes(initiating_state)
+        if deterministic:
+            return max(possible_outcomes, key=lambda x: x[1])[0]
         else:
-            max_value = max([self.q_table[(hash(state), hash(option))] for option in available_options])
-            best_actions = [
-                option for option in available_options if self.q_table[(hash(state), hash(option))] == max_value
-            ]
-            return random.choice(best_actions)
+            return random.choices(possible_outcomes, weights=[prob for (_, prob) in possible_outcomes])[0][0]
+
+    def possible_outcomes(self, initiating_state: Hashable) -> List[Tuple[Tuple[Hashable, float, int], float]]:
+        """
+        Returns a list of possible terminating states and discounted returns for the given initiating state and their probabilities of occurring.
+
+        Args:
+            initiating_state (Hashable): The state in which the option began executing.
+
+        Returns:
+            List[Tuple[Tuple[Hashable, float, int], float]]: A list of possible terminating states and discounted returns and their probabilities of occurring.
+        """
+        return self.transition_model[initiating_state].items()

@@ -15,7 +15,7 @@ from louvainskills.options import LouvainOption
 from louvainskills.options import SubgoalOption
 from louvainskills.options import EigenOption
 from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
-from louvainskills.option_trainers import LouvainOptionTrainer, BetweennessOptionTrainer
+from louvainskills.option_trainers import ValueIterationOptionTrainer
 
 from simpleoptions import PrimitiveOption, OptionAgent
 
@@ -66,9 +66,8 @@ def train_multi_level_agent(
     num_agents,
     num_epochs,
     epoch_length,
-    option_training_max_steps,
-    option_training_max_episode_steps,
-    option_training_max_num_episodes,
+    test_episode_cutoff,
+    option_training_num_rollouts,
     can_leave_initiation_set,
     output_directory,
     aggregate_graphs,
@@ -98,16 +97,14 @@ def train_multi_level_agent(
     env.set_options(primitive_options)
 
     # Train higher-level options.
-    options = []
-    option_trainer = LouvainOptionTrainer(
-        env,
-        stg,
-        max_steps=option_training_max_steps,
-        max_episode_steps=option_training_max_episode_steps,
-        max_num_episodes=option_training_max_num_episodes,
-        can_leave_initiation_set=can_leave_initiation_set,
-    )
+    if option_training_num_rollouts == 1:
+        option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
+    else:
+        option_trainer = ValueIterationOptionTrainer(
+            env, stg, gamma=1.0, theta=1e-5, num_rollouts=option_training_num_rollouts
+        )
 
+    options = []
     for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc=f"Hierachy Level"):
         options.append([])
 
@@ -121,11 +118,16 @@ def train_multi_level_agent(
         for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
             # Train skills at this level of the hierarchy.
             options[level].append(
-                LouvainOption(env, stg, i, u, v, can_leave_initiation_set, option_trainer.train_option_policy(i, u, v))
+                option_trainer.train_option_policy(
+                    LouvainOption(stg, i, u, v, can_leave_initiation_set), can_leave_initiation_set
+                )
             )
+            # For Debugging - Saves the STG.
+            nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+            # quit()
 
     # For Debugging - Saves the STG.
-    # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+    nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
     # quit()
 
     options = [option for level in options for option in level]
@@ -157,9 +159,10 @@ def train_multi_level_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=1,
-            test_length=epoch_length,
+            test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            episodic_eval=True,
         )
 
         # Write results to output file.
@@ -186,9 +189,8 @@ def train_single_level_agents(
     num_agents,
     num_epochs,
     epoch_length,
-    option_training_max_steps,
-    option_training_max_episode_steps,
-    option_training_max_num_episodes,
+    test_episode_cutoff,
+    option_training_num_rollouts,
     can_leave_initiation_set,
     output_directory,
     aggregate_graphs,
@@ -218,20 +220,21 @@ def train_single_level_agents(
     env.set_options(primitive_options)
 
     # Train higher-level options.
+    if option_training_num_rollouts == 1:
+        option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
+    else:
+        option_trainer = ValueIterationOptionTrainer(
+            env, stg, gamma=1.0, theta=1e-5, num_rollouts=option_training_num_rollouts
+        )
+
     options = []
-    option_trainer = LouvainOptionTrainer(
-        env,
-        stg,
-        max_steps=option_training_max_steps,
-        max_episode_steps=option_training_max_episode_steps,
-        max_num_episodes=option_training_max_num_episodes,
-        can_leave_initiation_set=can_leave_initiation_set,
-    )
     for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc=f"Hierachy Level"):
         options.append([])
         for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
             options[level].append(
-                LouvainOption(env, stg, i, u, v, can_leave_initiation_set, option_trainer.train_option_policy(i, u, v))
+                option_trainer.train_option_policy(
+                    LouvainOption(stg, i, u, v, can_leave_initiation_set), can_leave_initiation_set
+                )
             )
     gc.collect()
 
@@ -267,9 +270,10 @@ def train_single_level_agents(
                 num_epochs=num_epochs,
                 epoch_length=epoch_length,
                 test_interval=1,
-                test_length=epoch_length,
+                test_length=test_episode_cutoff,
                 test_runs=5,
                 verbose_logging=False,
+                episodic_eval=True,
             )
 
             # Write results to output file.
@@ -296,9 +300,8 @@ def train_flat_agent(
     num_agents,
     num_epochs,
     epoch_length,
-    option_training_max_steps,
-    option_training_max_episode_steps,
-    option_training_max_num_episodes,
+    test_episode_cutoff,
+    option_training_num_rollouts,
     can_leave_initiation_set,
     output_directory,
     aggregate_graphs,
@@ -333,20 +336,20 @@ def train_flat_agent(
     env.set_options(primitive_options)
 
     # Train higher-level options.
+    if option_training_num_rollouts == 1:
+        option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
+    else:
+        option_trainer = ValueIterationOptionTrainer(
+            env, stg, gamma=1.0, theta=1e-5, num_rollouts=option_training_num_rollouts
+        )
+
     options = []
-    option_trainer = LouvainOptionTrainer(
-        env,
-        stg,
-        max_steps=option_training_max_steps,
-        max_episode_steps=option_training_max_episode_steps,
-        max_num_episodes=option_training_max_num_episodes,
-        can_leave_initiation_set=can_leave_initiation_set,
-    )
     for hierarchy_level in tqdm(skill_hierarchy, desc=f"Hierachy Level"):
-        # hierarchy_level = skill_hierarchy[-1]
         for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
             options.append(
-                LouvainOption(env, stg, i, u, v, can_leave_initiation_set, option_trainer.train_option_policy(i, u, v))
+                option_trainer.train_option_policy(
+                    LouvainOption(stg, i, u, v, can_leave_initiation_set), can_leave_initiation_set
+                )
             )
     options.extend(primitive_options)
     gc.collect()
@@ -380,81 +383,10 @@ def train_flat_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=1,
-            test_length=epoch_length,
+            test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
-        )
-
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
-
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(train_results, f, ensure_ascii=False, indent=4)
-
-        gc.collect()
-
-
-def train_primitive_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    num_agents,
-    num_epochs,
-    epoch_length,
-    output_directory,
-    experiment_id,
-):
-    (EnvironmentType, kwargs, env_name) = environment_args
-
-    # Initialise environment.
-    env = EnvironmentType(**kwargs)
-    env.reset()
-
-    # Create options representing primitive actions.
-    primitive_options = []
-    for action in env.get_action_space():
-        primitive_options.append(PrimitiveOption(action, env))
-    env.set_options(primitive_options)
-
-    # Train higher-level options.
-    options = []
-    options.extend(primitive_options)
-    gc.collect()
-
-    # Generate results.
-    # Run Macro-Q Learning Agent
-    for run in tqdm(range(num_agents), desc="Primitive Agent"):
-        # Initialise our environment.
-        env = EnvironmentType(**kwargs)
-        env.set_options(options)
-
-        test_env = EnvironmentType(**kwargs)
-        test_env.set_options(options)
-
-        # Initialise our agent and train it.
-        agent = OptionAgent(
-            env,
-            test_env=test_env,
-            epsilon=epsilon,
-            macro_alpha=alpha,
-            intra_option_alpha=alpha,
-            gamma=gamma,
-            default_action_value=default_action_value,
-        )
-        train_results, test_results = agent.run_agent(
-            num_epochs=num_epochs,
-            epoch_length=epoch_length,
-            test_interval=1,
-            test_length=epoch_length,
-            test_runs=5,
-            verbose_logging=False,
+            episodic_eval=True,
         )
 
         # Write results to output file.
@@ -481,9 +413,8 @@ def train_betweenness_agent(
     num_agents,
     num_epochs,
     epoch_length,
-    option_training_max_steps,
-    option_training_max_episode_steps,
-    option_training_max_num_episodes,
+    test_episode_cutoff,
+    option_training_num_rollouts,
     output_directory,
     subgoals,
     centralities,
@@ -512,22 +443,26 @@ def train_betweenness_agent(
     print(f"Subgoals: {subgoals}")
 
     # Train higher-level options.
+    if option_training_num_rollouts == 1:
+        option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
+    else:
+        option_trainer = ValueIterationOptionTrainer(
+            env, stg, gamma=1.0, theta=1e-5, num_rollouts=option_training_num_rollouts
+        )
+
     options = []
-    option_trainer = BetweennessOptionTrainer(
-        env,
-        stg,
-        max_steps=option_training_max_steps,
-        max_episode_steps=option_training_max_episode_steps,
-        max_num_episodes=option_training_max_num_episodes,
-    )
+    option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
     for subgoal in tqdm(subgoals, desc="Betweenness Options"):
-        q_table, initiation_set = option_trainer.train_option_policy(subgoal, initiation_set_size)
-        options.append(SubgoalOption(env, stg, subgoal, initiation_set, q_table))
+        # Define initiation set as the n closest nodes that have a path to the subgoal node, where n = initiation_set_size.
+        initiation_set = sorted(list(nx.single_target_shortest_path_length(stg, subgoal)), key=lambda x: x[1])
+        initiation_set = list(list(zip(*initiation_set))[0])[1 : min(initiation_set_size + 1, len(initiation_set) - 1)]
+        options.append(option_trainer.train_option_policy(SubgoalOption(stg, subgoal, initiation_set), False))
+
     options.extend(primitive_options)
     gc.collect()
 
     # For Debugging - Saves the STG.
-    # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+    nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
     # quit()
 
     # Generate results.
@@ -555,9 +490,10 @@ def train_betweenness_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=1,
-            test_length=epoch_length,
+            test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            episodic_eval=True,
         )
 
         # Write results to output file.
@@ -584,6 +520,7 @@ def train_eigenoptions_agent(
     num_agents,
     num_epochs,
     epoch_length,
+    test_episode_cutoff,
     output_directory,
     pvfs,
     stg,
@@ -651,9 +588,10 @@ def train_eigenoptions_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=1,
-            test_length=epoch_length,
+            test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            episodic_eval=True,
         )
 
         # Write results to output file.
@@ -680,6 +618,7 @@ def train_agent_given_options(
     num_agents,
     num_epochs,
     epoch_length,
+    test_episode_cutoff,
     output_directory,
     experiment_id,
     options=None,
@@ -729,9 +668,84 @@ def train_agent_given_options(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=1,
-            test_length=epoch_length,
+            test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            episodic_eval=True,
+        )
+
+        # Write results to output file.
+        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
+        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+            json.dump(test_results, f, ensure_ascii=False, indent=4)
+
+        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
+        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+            json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        gc.collect()
+
+
+def train_primitive_agent(
+    environment_args,
+    epsilon,
+    alpha,
+    gamma,
+    default_action_value,
+    num_agents,
+    num_epochs,
+    epoch_length,
+    test_episode_cutoff,
+    output_directory,
+    experiment_id,
+):
+    (EnvironmentType, kwargs, env_name) = environment_args
+
+    # Initialise environment.
+    env = EnvironmentType(**kwargs)
+    env.reset()
+
+    # Create options representing primitive actions.
+    primitive_options = []
+    for action in env.get_action_space():
+        primitive_options.append(PrimitiveOption(action, env))
+    env.set_options(primitive_options)
+
+    # Train higher-level options.
+    options = []
+    options.extend(primitive_options)
+    gc.collect()
+
+    # Generate results.
+    # Run Macro-Q Learning Agent
+    for run in tqdm(range(num_agents), desc="Primitive Agent"):
+        # Initialise our environment.
+        env = EnvironmentType(**kwargs)
+        env.set_options(options)
+
+        test_env = EnvironmentType(**kwargs)
+        test_env.set_options(options)
+
+        # Initialise our agent and train it.
+        agent = OptionAgent(
+            env,
+            test_env=test_env,
+            epsilon=epsilon,
+            macro_alpha=alpha,
+            intra_option_alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+        )
+        train_results, test_results = agent.run_agent(
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_interval=1,
+            test_length=test_episode_cutoff,
+            test_runs=5,
+            verbose_logging=False,
+            episodic_eval=True,
         )
 
         # Write results to output file.
