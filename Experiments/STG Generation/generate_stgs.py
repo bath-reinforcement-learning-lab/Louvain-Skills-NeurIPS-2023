@@ -7,8 +7,8 @@ import networkx as nx
 from pathlib import Path
 
 from simpleenvs.envs.discrete_rooms.rooms import (
-    DiscreteXuFourRooms,
-    DiscreteDefaultNineRooms,
+    XuFourRooms,
+    NineRooms,
     RameshMaze,
 )
 from simpleenvs.envs.hanoi import HanoiEnvironment
@@ -22,8 +22,8 @@ from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
 if __name__ == "__main__":
     # Tuples of the form: (Env Class, Env Arguments, String Descriptor, Graph Layout Helper)
     environments = [
-        (DiscreteDefaultNineRooms, {}, "Grid", gridlayout),
-        (DiscreteXuFourRooms, {}, "Rooms", gridlayout),
+        (NineRooms, {}, "Grid", gridlayout),
+        (XuFourRooms, {}, "Rooms", gridlayout),
         (RameshMaze, {}, "Maze", gridlayout),
         (TaxiEnvironment, {}, "Taxi", None),
         (HanoiEnvironment, {"num_disks": 4, "num_poles": 3}, "Hanoi", None),
