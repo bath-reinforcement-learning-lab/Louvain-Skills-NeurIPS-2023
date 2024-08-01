@@ -105,6 +105,11 @@ venv.bak/
 .mypy_cache/
 .vscode/settings.json
 
+# R and RStudio files.
+.Rproj.user/
+.Rhistory
+.RData
+
 # Misc. Training Results
 Training Results/
 old/
