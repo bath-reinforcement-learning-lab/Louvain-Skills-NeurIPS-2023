@@ -1,6 +1,12 @@
 import random
 
-from simpleenvs.envs.hanoi import HanoiEnvironment
+from simpleenvs.envs.discrete_rooms import XuFourRooms
+from simpleenvs.envs.discrete_rooms.explorable_rooms import ExplorableXuFourRooms
+
+from louvainskills.envs.discrete_gridworlds import (
+    DiscreteXuFourRoomsBRTL,
+    DiscreteXuFourRoomsTRBL,
+)
 
 from louvainskills.agent_trainers import (
     generate_aggregate_graphs,
@@ -23,57 +29,32 @@ epsilon = 0.1
 alpha = 0.4
 gamma = 1.0
 default_action_value = 0.0
-n_step_updates = False
+n_step_updates = True
 num_agents = 10
 num_epochs = 100
 epoch_length = 100
-option_training_max_steps = 300_000
-option_training_max_episode_steps = 300
-option_training_max_num_episodes = 10_000
+test_episode_cutoff = 500
+option_training_num_rollouts = 1
 can_leave_initiation_set = False
 
-left_to_right_env_args = (
-    HanoiEnvironment,
-    {"num_disks": 4, "num_poles": 3, "start_state": (0, 0, 0, 0), "goal_state": (2, 2, 2, 2)},
-    "Hanoi",
-)
-left_to_mid_env_args = (
-    HanoiEnvironment,
-    {"num_disks": 4, "num_poles": 3, "start_state": (0, 0, 0, 0), "goal_state": (1, 1, 1, 1)},
-    "Hanoi",
-)
-mid_to_right_env_args = (
-    HanoiEnvironment,
-    {"num_disks": 4, "num_poles": 3, "start_state": (1, 1, 1, 1), "goal_state": (2, 2, 2, 2)},
-    "Hanoi",
-)
-right_to_left_env_args = (
-    HanoiEnvironment,
-    {"num_disks": 4, "num_poles": 3, "start_state": (2, 2, 2, 2), "goal_state": (0, 0, 0, 0)},
-    "Hanoi",
-)
-
-target_envs_args_list = [
-    left_to_right_env_args,
-    left_to_mid_env_args,
-    mid_to_right_env_args,
-    right_to_left_env_args,
-]
-
-for j, target_env_args in enumerate(target_envs_args_list):
-    for i in range(10):
+for j, TargetEnvironmentType in enumerate(
+    [
+        DiscreteXuFourRoomsBRTL,
+        DiscreteXuFourRoomsTRBL,
+    ]
+):
+    for i in range(25):
         # Define goal environment that we're deriving skills from.
         experiment_id = random.randrange(10000)
-        GoalEnvironmentType = HanoiEnvironment
-        goal_env_name = "Hanoi"
-        goal_kwargs = {"num_disks": 4, "num_poles": 3, "start_state": (0, 0, 0, 0), "goal_state": (2, 2, 2, 2)}
-        goal_environment_args = (GoalEnvironmentType, goal_kwargs, goal_env_name)
+        GoalEnvironmentType = ExplorableXuFourRooms
+        goal_env_name = "Rooms"
+        goal_kwargs = {}
+        goal_environment_args = (GoalEnvironmentType, {}, goal_env_name)
 
         # Define target environment.
-        env_type = target_env_args[0]
-        kwargs = target_env_args[1]
-        env_name = target_env_args[2]
-        environment_args = (env_type, kwargs, env_name)
+        env_name = "Rooms"
+        kwargs = {}
+        environment_args = (TargetEnvironmentType, kwargs, env_name)
 
         aggregate_graphs, stg = generate_aggregate_graphs(
             goal_environment_args,
@@ -91,6 +72,7 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
             output_directory="Primitive Agent",
             experiment_id=experiment_id,
         )
@@ -106,9 +88,8 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            option_training_max_steps=option_training_max_steps,
-            option_training_max_episode_steps=option_training_max_episode_steps,
-            option_training_max_num_episodes=option_training_max_num_episodes,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
             output_directory="Multi-Level Agent",
             aggregate_graphs=aggregate_graphs,
@@ -116,8 +97,48 @@ for j, target_env_args in enumerate(target_envs_args_list):
             experiment_id=experiment_id,
         )
 
+        # Individual Level Louvain Skills
+        train_single_level_agents(
+            environment_args=environment_args,
+            epsilon=epsilon,
+            alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+            n_step_updates=n_step_updates,
+            num_agents=num_agents,
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
+            can_leave_initiation_set=can_leave_initiation_set,
+            output_directory="Single-Level Agents",
+            aggregate_graphs=aggregate_graphs,
+            stg=stg,
+            experiment_id=experiment_id,
+        )
+
+        # Two-Level/Flat Louvain Skills
+        train_flat_agent(
+            environment_args=environment_args,
+            epsilon=epsilon,
+            alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+            n_step_updates=n_step_updates,
+            num_agents=num_agents,
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
+            can_leave_initiation_set=can_leave_initiation_set,
+            output_directory="Flat Agent",
+            aggregate_graphs=aggregate_graphs,
+            stg=stg,
+            experiment_id=experiment_id,
+        )
+
         # Eigenoptions
-        pvfs, stg = derive_pvfs(stg, 16)
+        pvfs, eig_stg = derive_pvfs(stg, 16)
         train_eigenoptions_agent(
             environment_args=environment_args,
             epsilon=epsilon,
@@ -128,9 +149,10 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
             output_directory="Eigenoptions",
             pvfs=pvfs,
-            stg=stg,
+            stg=eig_stg,
             experiment_id=experiment_id,
         )
 
@@ -146,9 +168,8 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            option_training_max_steps=option_training_max_steps,
-            option_training_max_episode_steps=option_training_max_episode_steps,
-            option_training_max_num_episodes=option_training_max_num_episodes,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
             output_directory="Betweenness",
             subgoals=subgoals,
             centralities=centralities,
@@ -170,9 +191,8 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            option_training_max_steps=option_training_max_steps,
-            option_training_max_episode_steps=option_training_max_episode_steps,
-            option_training_max_num_episodes=option_training_max_num_episodes,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
             output_directory="Label Propagation",
             aggregate_graphs=aggregate_graph,
@@ -192,9 +212,8 @@ for j, target_env_args in enumerate(target_envs_args_list):
             num_agents=num_agents,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            option_training_max_steps=option_training_max_steps,
-            option_training_max_episode_steps=option_training_max_episode_steps,
-            option_training_max_num_episodes=option_training_max_num_episodes,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
             output_directory="Edge Betweenness",
             aggregate_graphs=aggregate_graph,

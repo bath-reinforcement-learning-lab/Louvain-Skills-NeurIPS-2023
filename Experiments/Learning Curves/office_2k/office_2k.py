@@ -24,16 +24,15 @@ epsilon = 0.1
 alpha = 0.4
 gamma = 1.0
 default_action_value = 0.0
-n_step_updates = False
+n_step_updates = True
 num_agents = 20
-num_epochs = 300
+num_epochs = 500
 epoch_length = 1000
-option_training_max_steps = 750_000
-option_training_max_episode_steps = 500
-option_training_max_num_episodes = 15_000
+test_episode_cutoff = 1000
+option_training_num_rollouts = 1
 can_leave_initiation_set = False
 
-for i in range(40):
+for i in range(10):
     experiment_id = random.randrange(10000)
 
     # Read office file and load environment.
@@ -59,6 +58,7 @@ for i in range(40):
         num_agents=num_agents,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
+        test_episode_cutoff=test_episode_cutoff,
         output_directory="Primitive Agent",
         experiment_id=experiment_id,
     )
@@ -74,9 +74,8 @@ for i in range(40):
         num_agents=num_agents,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
-        option_training_max_steps=option_training_max_steps,
-        option_training_max_episode_steps=option_training_max_episode_steps,
-        option_training_max_num_episodes=option_training_max_num_episodes,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
         can_leave_initiation_set=can_leave_initiation_set,
         output_directory="Multi-Level Agent",
         aggregate_graphs=aggregate_graphs,
@@ -85,7 +84,7 @@ for i in range(40):
     )
 
     # Eigenoptions
-    pvfs, stg = derive_pvfs(stg, 16)
+    pvfs, eig_stg = derive_pvfs(stg, 16)
     train_eigenoptions_agent(
         environment_args=environment_args,
         epsilon=epsilon,
@@ -96,9 +95,10 @@ for i in range(40):
         num_agents=num_agents,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
+        test_episode_cutoff=test_episode_cutoff,
         output_directory="Eigenoptions",
         pvfs=pvfs,
-        stg=stg,
+        stg=eig_stg,
         experiment_id=experiment_id,
     )
 
@@ -114,9 +114,8 @@ for i in range(40):
         num_agents=num_agents,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
-        option_training_max_steps=option_training_max_steps,
-        option_training_max_episode_steps=option_training_max_episode_steps,
-        option_training_max_num_episodes=option_training_max_num_episodes,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
         output_directory="Betweenness",
         subgoals=subgoals,
         centralities=centralities,
@@ -138,9 +137,8 @@ for i in range(40):
         num_agents=num_agents,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
-        option_training_max_steps=option_training_max_steps,
-        option_training_max_episode_steps=option_training_max_episode_steps,
-        option_training_max_num_episodes=option_training_max_num_episodes,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
         can_leave_initiation_set=can_leave_initiation_set,
         output_directory="Label Propagation",
         aggregate_graphs=aggregate_graph,
