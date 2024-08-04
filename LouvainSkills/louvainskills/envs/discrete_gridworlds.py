@@ -28,6 +28,15 @@ class DiscreteXuFourRoomsTRBL(DiscreteRoomEnvironment):
         super().__init__(xu_four_rooms_trbl, movement_penalty, goal_reward)
 
 
+with pkg_resources.path(data, "xu_four_rooms_bltr.txt") as path:
+    xu_four_rooms_bltr = path
+
+# DiscreteXuFourRoomsBLTR
+class DiscreteXuFourRoomsBLTR(DiscreteRoomEnvironment):
+    def __init__(self, movement_penalty=-0.001, goal_reward=1):
+        super().__init__(xu_four_rooms_bltr, movement_penalty, goal_reward)
+
+
 # NineRooms Variants
 with pkg_resources.path(data, "nine_rooms_bltr.txt") as path:
     nine_rooms_bltr = path
@@ -40,6 +49,15 @@ class DiscreteNineRoomsBLTR(DiscreteRoomEnvironment):
 
 with pkg_resources.path(data, "nine_rooms_brtl.txt") as path:
     nine_rooms_brtl = path
+
+
+class DiscreteNineRoomsTRBL(DiscreteRoomEnvironment):
+    def __init__(self, movement_penalty=-0.001, goal_reward=1):
+        super().__init__(nine_rooms_trbl, movement_penalty, goal_reward)
+
+
+with pkg_resources.path(data, "nine_rooms_trbl.txt") as path:
+    nine_rooms_trbl = path
 
 
 class DiscreteNineRoomsBRTL(DiscreteRoomEnvironment):
@@ -55,3 +73,19 @@ with pkg_resources.path(data, "ramesh_maze_bltr.txt") as path:
 class DiscreteRameshMazeBLTR(DiscreteRoomEnvironment):
     def __init__(self, movement_penalty=-0.001, goal_reward=1):
         super().__init__(ramesh_maze_bltr, movement_penalty, goal_reward)
+
+
+with pkg_resources.path(data, "ramesh_maze_trbl.txt") as path:
+    ramesh_maze_trbl = path
+
+class DiscreteRameshMazeTRBL(DiscreteRoomEnvironment):
+    def __init__(self, movement_penalty=-0.001, goal_reward=1):
+        super().__init__(ramesh_maze_trbl, movement_penalty, goal_reward)
+
+
+with pkg_resources.path(data, "ramesh_maze_brtl.txt") as path:
+    ramesh_maze_brtl = path
+
+class DiscreteRameshMazeBRTL(DiscreteRoomEnvironment):
+    def __init__(self, movement_penalty=-0.001, goal_reward=1):
+        super().__init__(ramesh_maze_brtl, movement_penalty, goal_reward)
