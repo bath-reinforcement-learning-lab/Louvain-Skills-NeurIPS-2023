@@ -1,6 +1,6 @@
 import random
 
-from simpleenvs.envs.discrete_rooms import DiscreteXuFourRooms
+from simpleenvs.envs.discrete_rooms import XuFourRooms
 
 from louvainskills.agent_trainers import (
     generate_aggregate_graphs,
@@ -25,6 +25,7 @@ gamma = 1.0
 default_action_value = 0.0
 n_step_updates = True
 num_agents = 10
+test_interval = 1
 num_epochs = 100
 epoch_length = 100
 option_training_num_rollouts = 1
@@ -34,7 +35,7 @@ for i in range(40):
 
     experiment_id = random.randrange(10000)
 
-    EnvironmentType = DiscreteXuFourRooms
+    EnvironmentType = XuFourRooms
     kwargs = {}
     env_name = "SimpleFourRooms"
     environment_args = (EnvironmentType, kwargs, env_name)
@@ -53,6 +54,7 @@ for i in range(40):
         gamma=gamma,
         default_action_value=default_action_value,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         output_directory="Primitive Agent",
@@ -68,6 +70,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,
@@ -87,6 +90,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,
@@ -106,6 +110,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,
@@ -126,6 +131,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,
@@ -148,6 +154,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         output_directory="Eigenoptions",
@@ -166,6 +173,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,
@@ -186,6 +194,7 @@ for i in range(40):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         option_training_num_rollouts=option_training_num_rollouts,

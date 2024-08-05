@@ -31,6 +31,7 @@ gamma = 1.0
 default_action_value = 0.0
 n_step_updates = True
 num_agents = 10
+test_interval = 1
 num_epochs = 100
 epoch_length = 100
 test_episode_cutoff = 500
@@ -70,6 +71,7 @@ for j, TargetEnvironmentType in enumerate(
             gamma=gamma,
             default_action_value=default_action_value,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -86,6 +88,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -106,6 +109,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -126,6 +130,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -147,6 +152,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -166,6 +172,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -189,6 +196,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
@@ -210,6 +218,7 @@ for j, TargetEnvironmentType in enumerate(
             default_action_value=default_action_value,
             n_step_updates=n_step_updates,
             num_agents=num_agents,
+            test_interval=test_interval,
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,

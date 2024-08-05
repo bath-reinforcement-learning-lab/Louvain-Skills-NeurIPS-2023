@@ -27,8 +27,9 @@ gamma = 1.0
 default_action_value = 0.0
 n_step_updates = True
 num_agents = 10
-num_epochs = 100
-epoch_length = 750
+test_interval = 2
+num_epochs = 200
+epoch_length = 1000
 test_episode_cutoff = 1000
 option_training_num_rollouts = 1
 can_leave_initiation_set = False
@@ -54,6 +55,7 @@ for i in range(50):
         gamma=gamma,
         default_action_value=default_action_value,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -70,6 +72,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -90,6 +93,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -110,6 +114,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -131,6 +136,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -150,6 +156,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -173,6 +180,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
@@ -194,6 +202,7 @@ for i in range(50):
         default_action_value=default_action_value,
         n_step_updates=n_step_updates,
         num_agents=num_agents,
+        test_interval=test_interval,
         num_epochs=num_epochs,
         epoch_length=epoch_length,
         test_episode_cutoff=test_episode_cutoff,
