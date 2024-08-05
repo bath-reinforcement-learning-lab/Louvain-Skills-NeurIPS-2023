@@ -73,6 +73,7 @@ def train_multi_level_agent(
     aggregate_graphs,
     stg,
     experiment_id,
+    test_interval: int,
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -155,26 +156,36 @@ def train_multi_level_agent(
             default_action_value=default_action_value,
         )
 
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        # Save epoch-based evaluation performance.
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        # Save episode-based evaluation performance.
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
 
@@ -187,6 +198,7 @@ def train_single_level_agents(
     default_action_value,
     n_step_updates,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -266,26 +278,38 @@ def train_single_level_agents(
                 n_step_updates=n_step_updates,
                 default_action_value=default_action_value,
             )
-            train_results, test_results = agent.run_agent(
+            train_results, epoch_test_results, episode_test_results = agent.run_agent(
                 num_epochs=num_epochs,
                 epoch_length=epoch_length,
-                test_interval=1,
+                test_interval=test_interval,
                 test_length=test_episode_cutoff,
                 test_runs=5,
                 verbose_logging=False,
+                epoch_eval=True,
                 episodic_eval=True,
             )
 
-            # Write results to output file.
-            test_dir = f"./Training Results/{env_name}/{output_directory}/Level {level}/"
-            Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-            with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-                json.dump(test_results, f, ensure_ascii=False, indent=4)
+            run_id = uuid.uuid1()
 
-            train_dir = f"./Training Results/{env_name}/Train/{output_directory}/Level {level}/"
-            Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-            with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+            # Save training performance.
+            train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/Level {level}/"
+            Path(train_dir).mkdir(parents=True, exist_ok=True)
+            with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
                 json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+            # Save epoch-based evaluation performance.
+            epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/Level {level}/"
+            Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+            with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+                json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+            # Save epoch-based evaluation performance.
+            episode_test_dir = (
+                f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/Level {level}/"
+            )
+            Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+            with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+                json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
             gc.collect()
 
@@ -298,6 +322,7 @@ def train_flat_agent(
     default_action_value,
     n_step_updates,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -379,26 +404,36 @@ def train_flat_agent(
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
         )
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        # Save epoch-based evaluation performance.
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        # Save episode-based evaluation performance.
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
 
@@ -411,6 +446,7 @@ def train_betweenness_agent(
     default_action_value,
     n_step_updates,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -486,26 +522,36 @@ def train_betweenness_agent(
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
         )
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        # Save epoch-based evaluation performance.
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        # Save episode-based evaluation performance.
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
 
@@ -518,6 +564,7 @@ def train_eigenoptions_agent(
     default_action_value,
     n_step_updates,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -584,26 +631,36 @@ def train_eigenoptions_agent(
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
         )
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        # Save epoch-based evaluation performance.
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        # Save episode-based evaluation performance.
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
 
@@ -616,6 +673,7 @@ def train_agent_given_options(
     default_action_value,
     n_step_updates,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -664,26 +722,36 @@ def train_agent_given_options(
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
         )
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        # Save epoch-based evaluation performance.
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        # Save episode-based evaluation performance.
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
 
@@ -695,6 +763,7 @@ def train_primitive_agent(
     gamma,
     default_action_value,
     num_agents,
+    test_interval,
     num_epochs,
     epoch_length,
     test_episode_cutoff,
@@ -738,25 +807,33 @@ def train_primitive_agent(
             gamma=gamma,
             default_action_value=default_action_value,
         )
-        train_results, test_results = agent.run_agent(
+        train_results, epoch_test_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
-            test_interval=1,
+            test_interval=test_interval,
             test_length=test_episode_cutoff,
             test_runs=5,
             verbose_logging=False,
+            epoch_eval=True,
             episodic_eval=True,
         )
 
-        # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
-        Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
-        with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=4)
+        run_id = uuid.uuid1()
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
-        Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
-        with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+        # Save training performance.
+        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        Path(train_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
+
+        epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
+
+        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
+            json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
