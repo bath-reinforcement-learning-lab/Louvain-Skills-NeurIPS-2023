@@ -17,7 +17,9 @@ from louvainskills.options import EigenOption
 from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
 from louvainskills.option_trainers import ValueIterationOptionTrainer
 
-from simpleoptions import PrimitiveOption, OptionAgent
+from simpleoptions import BaseOption, PrimitiveOption, OptionAgent
+
+from typing import Type, Dict, Tuple, List, Hashable, Mapping
 
 
 def generate_aggregate_graphs(
@@ -57,24 +59,46 @@ def generate_aggregate_graphs(
 
 
 def train_multi_level_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    option_training_num_rollouts,
-    can_leave_initiation_set,
-    output_directory,
-    aggregate_graphs,
-    stg,
-    experiment_id,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
     test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    option_training_num_rollouts: int,
+    can_leave_initiation_set: bool,
+    output_directory: str,
+    aggregate_graphs: List[nx.DiGraph],
+    stg: nx.DiGraph,
+    experiment_id: int,
 ):
+    """
+    Generate a multi-level hierarchy of Louvain options and use them to train a Macro-Q/Intra-Option Learning agent.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        option_training_num_rollouts (int): The number of rollouts to use when training options.
+        can_leave_initiation_set (int): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
+        output_directory (str): The directory to save the training results in.
+        aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
@@ -191,24 +215,48 @@ def train_multi_level_agent(
 
 
 def train_single_level_agents(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    option_training_num_rollouts,
-    can_leave_initiation_set,
-    output_directory,
-    aggregate_graphs,
-    stg,
-    experiment_id,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    option_training_num_rollouts: int,
+    can_leave_initiation_set: bool,
+    output_directory: str,
+    aggregate_graphs: List[nx.DiGraph],
+    stg: nx.DiGraph,
+    experiment_id: int,
 ):
+    """
+    Generate a series of single-level skill hierarchies, each based on a partition of the state-transition graph determined
+    by a single level of the clsuter hierarchy produced by the Louvain algorithm.
+    Then, train Macro-Q/Intra-Option Learning agents using these hierarchies.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        option_training_num_rollouts (int): The number of rollouts to use when training options.
+        can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
+        output_directory (str): The directory to save the training results in.
+        aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
@@ -315,24 +363,49 @@ def train_single_level_agents(
 
 
 def train_flat_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    option_training_num_rollouts,
-    can_leave_initiation_set,
-    output_directory,
-    aggregate_graphs,
-    stg,
-    experiment_id,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    option_training_num_rollouts: int,
+    can_leave_initiation_set: bool,
+    output_directory: str,
+    aggregate_graphs: List[nx.DiGraph],
+    stg: nx.DiGraph,
+    experiment_id: int,
 ):
+    """
+    Generate a single-level hierarchy of Louvain options and use them to train a Macro-Q/Intra-Option Learning agent.
+    The hierarchy is based on the full set of partitions produced by the Louvain algorithm, but is flat (i.e., all option
+    policies are defined over primitive actions). Then, train a Macro-Q/Intra-Option Learning agent using these options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        option_training_num_rollouts (int): The number of rollouts to use when training options.
+        can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
+        output_directory (str): The directory to save the training results in.
+        aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+    """
+
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
@@ -439,26 +512,51 @@ def train_flat_agent(
 
 
 def train_betweenness_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    option_training_num_rollouts,
-    output_directory,
-    subgoals,
-    centralities,
-    n_options,
-    initiation_set_size,
-    stg,
-    experiment_id,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    option_training_num_rollouts: int,
+    output_directory: str,
+    subgoals: List[Hashable],
+    centralities: Mapping[Hashable, float],
+    n_options: int,
+    initiation_set_size: int,
+    stg: nx.DiGraph,
+    experiment_id: int,
 ):
+    """
+    Generate a set of skills for navigating to the n highest local maxima of betweenness on the state-transition graph.
+    Then, train a Macro-Q/Intra-Option Learning agent using these options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        option_training_num_rollouts (int): The number of rollouts to use when training options.
+        output_directory (str): The directory to save the training results in.
+        subgoals (List[Hashable]): The subgoals to train options for.
+        centralities (Mapping[Hashable, float]): The betweenness centralities of each node in the state-transition graph.
+        n_options (int): The number of options to train.
+        initiation_set_size (int): The size of the initiation set for each option.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
@@ -557,23 +655,45 @@ def train_betweenness_agent(
 
 
 def train_eigenoptions_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    output_directory,
-    pvfs,
-    stg,
-    experiment_id,
-    training_env_args=None,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    output_directory: str,
+    pvfs: List[Dict[Hashable, float]],
+    stg: nx.DiGraph,
+    experiment_id: int,
+    training_env_args: Tuple[Type, Dict, str] = None,
 ):
+    """
+    Generate a set of skills for "traversing the principal directions of the environment", based on the Eigenoptions
+    method proposed by Machado et al. (2017). Then, train a Macro-Q/Intra-Option Learning agent using these options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        output_directory (str): The directory to save the training results in.
+        pvfs (List[Dict[Hashable, float]]): The proto-value functions to train options based on.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+        training_env_args (Tuple[Type, Dict, str], optional): The type, arguments, and name of the environment to train the eigenoptions in. Defaults to None, in which case the same environment is used for training and
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
@@ -666,22 +786,42 @@ def train_eigenoptions_agent(
 
 
 def train_agent_given_options(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    n_step_updates,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    output_directory,
-    experiment_id,
-    options=None,
-    exploration_options=None,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    output_directory: str,
+    experiment_id: int,
+    options: List[BaseOption] = None,
+    exploration_options: List[BaseOption] = None,
 ):
+    """
+    Given an arbitrary set of options, train a Macro-Q/Intra-Option Learning agent using these options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        output_directory (str): The directory to save the training results in.
+        experiment_id (int): The ID of the experiment being run.
+        options (List[BaseOption], optional): The set of options available for the agent to choose. Defaults to None, in which only primitive options are made available.
+        exploration_options (List[BaseOption], optional): The set of options available for the agent to explore using, but not explicitly choose. Defaults to None.
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Create options representing primitive actions.
@@ -757,19 +897,36 @@ def train_agent_given_options(
 
 
 def train_primitive_agent(
-    environment_args,
-    epsilon,
-    alpha,
-    gamma,
-    default_action_value,
-    num_agents,
-    test_interval,
-    num_epochs,
-    epoch_length,
-    test_episode_cutoff,
-    output_directory,
-    experiment_id,
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    output_directory: str,
+    experiment_id: int,
 ):
+    """
+    Train a Macro-Q Learning agent using only primitive options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        output_directory (str): The directory to save the training results in.
+        experiment_id (int): The ID of the experiment being run.
+    """
     (EnvironmentType, kwargs, env_name) = environment_args
 
     # Initialise environment.
