@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="louvainskills",
-    version="1.0.0",
+    version="2.0.0",
     author="Joshua Evans",
     author_email="jbe25@bath.ac.uk",
     description="Code accompanying the paper 'Creating Multi-Level Skill Hierarchies in Reinforcement Learning'. Published as a conference paper at NeurIPS 2023.",
@@ -19,7 +19,7 @@ setuptools.setup(
         "wheel",
         "numpy",
         "scipy",
-        "networkx",
+        "networkx<3.5",
         "igraph",
         "python-igraph",
         "leidenalg",
