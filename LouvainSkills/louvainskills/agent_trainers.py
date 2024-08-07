@@ -504,6 +504,122 @@ def train_flat_agent(
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
 
         gc.collect()
+
+
+def train_xu_agent(
+    environment_args: Tuple[Type, Dict, str],
+    epsilon: float,
+    alpha: float,
+    gamma: float,
+    default_action_value: float,
+    n_step_updates: bool,
+    num_agents: int,
+    test_interval: int,
+    num_epochs: int,
+    epoch_length: int,
+    test_episode_cutoff: int,
+    option_training_num_rollouts: int,
+    can_leave_initiation_set: bool,
+    output_directory: str,
+    aggregate_graphs: List[nx.DiGraph],
+    stg: nx.DiGraph,
+    experiment_id: int,
+):
+    """
+    Generate a single-level skill heirarchy based on the final (i.e., highest-level) partition of the state-transition graph
+    produced by the Louvain algorithm. This is the method proposed by Xu et al. (2018).
+    Then, train a Macro-Q/Intra-Option Learning agent using these options.
+
+    Args:
+        environment_args (Tuple[Type, Dict, str]): The type, arguments, and name of the environment to train the agent in.
+        epsilon (float): Exploration rate for the agent.
+        alpha (float): Learning rate for the agent.
+        gamma (float): Discount factor for the agent.
+        default_action_value (float): The default value to assign to unseen state-action pairs.
+        n_step_updates (bool): Whether or not to use n-step updates.
+        num_agents (int): The number of agents to train.
+        test_interval (int): The interval at which to test the agent, in epochs.
+        num_epochs (int): The number of epochs to train the agent for.
+        epoch_length (int): The length of each epoch, in primitive decision stages.
+        test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
+        option_training_num_rollouts (int): The number of rollouts to use when training options.
+        can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
+        output_directory (str): The directory to save the training results in.
+        aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs produced by the Louvain algorithm. Only the final one is used.
+        stg (nx.DiGraph): The state-transition graph of the environment.
+        experiment_id (int): The ID of the experiment being run.
+    """
+
+    (EnvironmentType, kwargs, env_name) = environment_args
+
+    # Initialise environment.
+    env = EnvironmentType(**kwargs)
+    env.reset()
+
+    # Create a list of skills to train.
+    xu_skills = []
+    for i, aggregate_graph in enumerate(aggregate_graphs[1:]):
+        # Skip all but the last aggregate graph.
+        if i < len(aggregate_graphs[1:]) - 1:
+            print(f"Skipped Level {i}")
+            continue
+
+        for u, v in aggregate_graph.edges():
+            if u != v:
+                print(f"({i}: {u} --> {v})")
+                xu_skills.append((i, u, v))
+
+    # Create options representing primitive actions.
+    primitive_options = []
+    for action in env.get_action_space():
+        primitive_options.append(PrimitiveOption(action, env))
+    env.set_options(primitive_options)
+
+    # Train higher-level options.
+    if option_training_num_rollouts == 1:
+        option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
+    else:
+        option_trainer = ValueIterationOptionTrainer(
+            env, stg, gamma=1.0, theta=1e-5, num_rollouts=option_training_num_rollouts
+        )
+
+    options = []
+
+    for i, u, v in tqdm(xu_skills, desc="Training Skills"):
+        options.append(
+            option_trainer.train_option_policy(
+                LouvainOption(stg, i, u, v, can_leave_initiation_set), can_leave_initiation_set
+            )
+        )
+    options.extend(primitive_options)
+    gc.collect()
+
+    # For Debugging - Saves the STG.
+    # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+    # quit()
+
+    # Generate results.
+    # Run Macro-Q Learning Agent
+    for run in tqdm(range(num_agents), desc="Xu et. al (2018) Agent"):
+        # Initialise our environment.
+        env = EnvironmentType(**kwargs)
+        env.set_options(options)
+
+        test_env = EnvironmentType(**kwargs)
+        test_env.set_options(options)
+
+        # Initialise our agent and train it.
+        agent = OptionAgent(
+            env,
+            test_env=test_env,
+            epsilon=epsilon,
+            macro_alpha=alpha,
+            intra_option_alpha=alpha,
+            gamma=gamma,
+            n_step_updates=n_step_updates,
+            default_action_value=default_action_value,
+        )
+        train_results, episode_test_results = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
