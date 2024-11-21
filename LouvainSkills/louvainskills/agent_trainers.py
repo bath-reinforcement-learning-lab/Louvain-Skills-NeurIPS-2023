@@ -74,6 +74,7 @@ def train_multi_level_agent(
     aggregate_graphs,
     stg,
     experiment_id,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -163,12 +164,12 @@ def train_multi_level_agent(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -194,6 +195,7 @@ def train_single_level_agents(
     aggregate_graphs,
     stg,
     experiment_id,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -273,12 +275,12 @@ def train_single_level_agents(
             )
 
             # Write results to output file.
-            test_dir = f"./Training Results/{env_name}/{output_directory}/Level {level}/"
+            test_dir = f"{output_dir}/{env_name}/{output_directory}/Level {level}/"
             Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
             with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
                 json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-            train_dir = f"./Training Results/{env_name}/Train/{output_directory}/Level {level}/"
+            train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/Level {level}/"
             Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
             with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
                 json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -304,6 +306,7 @@ def train_flat_agent(
     aggregate_graphs,
     stg,
     experiment_id,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -386,12 +389,12 @@ def train_flat_agent(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -410,6 +413,7 @@ def train_primitive_agent(
     epoch_length,
     output_directory,
     experiment_id,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -458,12 +462,12 @@ def train_primitive_agent(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -491,6 +495,7 @@ def train_betweenness_agent(
     initiation_set_size,
     stg,
     experiment_id,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -561,12 +566,12 @@ def train_betweenness_agent(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -589,6 +594,7 @@ def train_eigenoptions_agent(
     stg,
     experiment_id,
     training_env_args=None,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -657,12 +663,12 @@ def train_eigenoptions_agent(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -684,6 +690,7 @@ def train_agent_given_options(
     experiment_id,
     options=None,
     exploration_options=None,
+    output_dir="./Training Results",
 ):
     (EnvironmentType, kwargs, env_name) = environment_args
 
@@ -735,12 +742,12 @@ def train_agent_given_options(
         )
 
         # Write results to output file.
-        test_dir = f"./Training Results/{env_name}/{output_directory}/"
+        test_dir = f"{output_dir}/{env_name}/{output_directory}/"
         Path(test_dir).mkdir(parents=True, exist_ok=True)  # Testing performance.
         with open(f"{test_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-        train_dir = f"./Training Results/{env_name}/Train/{output_directory}/"
+        train_dir = f"{output_dir}/{env_name}/Train/{output_directory}/"
         Path(train_dir).mkdir(parents=True, exist_ok=True)  # Training performance.
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
