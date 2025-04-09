@@ -32,7 +32,7 @@ epoch_length = 100
 test_episode_cutoff = 60
 option_training_num_rollouts = 10_000
 can_leave_initiation_set = False
-results_directory = "./Training Results/Learning Curves/Taxi"
+results_directory = "./Training Results/Learning Curves/Playroom"
 
 
 for i in range(1):
