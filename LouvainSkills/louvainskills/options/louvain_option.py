@@ -138,7 +138,7 @@ class LouvainOption(PseudoRewardOption):
         return f"LouvainOption(Level: {self.hierarchy_level}, Source: {self.source_cluster}, Target: {self.target_cluster})"
 
     def __hash__(self):
-        return hash(str(self))
+        return hash((self._class_id, self.hierarchy_level, self.source_cluster, self.target_cluster))
 
     def __eq__(self, other):
         if isinstance(other, LouvainOption):

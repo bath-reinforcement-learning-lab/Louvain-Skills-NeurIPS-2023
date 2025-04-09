@@ -164,7 +164,7 @@ class EigenOption(BaseOption):
         return str(self)
 
     def __hash__(self):
-        return hash(str(self))
+        return hash((self._class_id, self.eigenoption_index))
 
     def __eq__(self, other):
         if isinstance(other, EigenOption):

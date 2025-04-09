@@ -63,7 +63,7 @@ class SubgoalOption(PseudoRewardOption):
         return f"SubgoalOption(Subgoal: {self.subgoal}, Initiation Set Size: {len(self.initiation_set)})"
 
     def __hash__(self):
-        return hash(str(self))
+        return hash((self._class_id, self.subgoal, len(self.initiation_set)))
 
     def __eq__(self, other):
         if isinstance(other, SubgoalOption):
