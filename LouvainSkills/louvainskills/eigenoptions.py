@@ -79,4 +79,4 @@ if __name__ == "__main__":
         option = EigenOption(env, stg, pvfs[i], i)
         option.train()
 
-    nx.write_gexf(stg, f"eigenoption pvf test {env_name}.gexf", prettyprint=True)
+    # nx.write_gexf(stg, f"eigenoption pvf test {env_name}.gexf", prettyprint=True)

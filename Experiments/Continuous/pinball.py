@@ -213,5 +213,5 @@ if __name__ == "__main__":
 
     # Apply layout and save.
     pinballlayout(stg)
-    nx.write_gexf(stg, f"pinball.gexf", prettyprint=True)
+    # nx.write_gexf(stg, f"pinball.gexf", prettyprint=True)
     print("Finished!")

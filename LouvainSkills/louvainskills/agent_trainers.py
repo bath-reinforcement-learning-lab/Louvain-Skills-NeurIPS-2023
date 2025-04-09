@@ -3,6 +3,8 @@ import json
 import uuid
 import copy
 
+import numpy as np
+
 import networkx as nx
 
 import louvainskills.utils.istarmap
@@ -19,7 +21,9 @@ from louvainskills.option_trainers import ValueIterationOptionTrainer
 
 from simpleoptions import BaseOption, PrimitiveOption, OptionAgent
 
-from typing import Type, Dict, Tuple, List, Hashable, Mapping
+from typing import Type, Dict, Tuple, List, Hashable, Mapping, Optional
+
+from pathlib import Path
 
 
 def generate_aggregate_graphs(
@@ -72,10 +76,11 @@ def train_multi_level_agent(
     test_episode_cutoff: int,
     option_training_num_rollouts: int,
     can_leave_initiation_set: bool,
-    output_directory: str,
+    results_directory: Path,
     aggregate_graphs: List[nx.DiGraph],
     stg: nx.DiGraph,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a multi-level hierarchy of Louvain options and use them to train a Macro-Q/Intra-Option Learning agent.
@@ -149,7 +154,7 @@ def train_multi_level_agent(
             )
 
     # For Debugging - Saves the STG.
-    nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+    # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
     # quit()
 
     options = [option for level in options for option in level]
@@ -175,9 +180,10 @@ def train_multi_level_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
 
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -191,7 +197,7 @@ def train_multi_level_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -203,7 +209,7 @@ def train_multi_level_agent(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -225,10 +231,11 @@ def train_single_level_agents(
     test_episode_cutoff: int,
     option_training_num_rollouts: int,
     can_leave_initiation_set: bool,
-    output_directory: str,
+    results_directory: Path,
     aggregate_graphs: List[nx.DiGraph],
     stg: nx.DiGraph,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a series of single-level skill hierarchies, each based on a partition of the state-transition graph determined
@@ -322,8 +329,9 @@ def train_single_level_agents(
                 gamma=gamma,
                 n_step_updates=n_step_updates,
                 default_action_value=default_action_value,
+                rng = rng,
             )
-            train_results, episode_test_results = agent.run_agent(
+            train_results, episode_test_results, *others = agent.run_agent(
                 num_epochs=num_epochs,
                 epoch_length=epoch_length,
                 test_interval=test_interval,
@@ -337,7 +345,7 @@ def train_single_level_agents(
             run_id = uuid.uuid1()
 
             # Save training performance.
-            train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/Level {level}/"
+            train_dir = results_directory / "Train"
             Path(train_dir).mkdir(parents=True, exist_ok=True)
             with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
                 json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -349,9 +357,7 @@ def train_single_level_agents(
             #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
             # Save epoch-based evaluation performance.
-            episode_test_dir = (
-                f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/Level {level}/"
-            )
+            episode_test_dir = results_directory / "Test"
             Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
             with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
                 json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -373,10 +379,11 @@ def train_flat_agent(
     test_episode_cutoff: int,
     option_training_num_rollouts: int,
     can_leave_initiation_set: bool,
-    output_directory: str,
+    results_directory: Path,
     aggregate_graphs: List[nx.DiGraph],
     stg: nx.DiGraph,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a single-level hierarchy of Louvain options and use them to train a Macro-Q/Intra-Option Learning agent.
@@ -468,8 +475,9 @@ def train_flat_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -483,7 +491,7 @@ def train_flat_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -495,7 +503,7 @@ def train_flat_agent(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -517,10 +525,11 @@ def train_xu_agent(
     test_episode_cutoff: int,
     option_training_num_rollouts: int,
     can_leave_initiation_set: bool,
-    output_directory: str,
+    results_directory: Path,
     aggregate_graphs: List[nx.DiGraph],
     stg: nx.DiGraph,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a single-level skill heirarchy based on the final (i.e., highest-level) partition of the state-transition graph
@@ -615,8 +624,9 @@ def train_xu_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -630,7 +640,7 @@ def train_xu_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -642,7 +652,7 @@ def train_xu_agent(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -663,13 +673,14 @@ def train_betweenness_agent(
     epoch_length: int,
     test_episode_cutoff: int,
     option_training_num_rollouts: int,
-    output_directory: str,
+    results_directory: Path,
     subgoals: List[Hashable],
     centralities: Mapping[Hashable, float],
     n_options: int,
     initiation_set_size: int,
     stg: nx.DiGraph,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a set of skills for navigating to the n highest local maxima of betweenness on the state-transition graph.
@@ -713,8 +724,6 @@ def train_betweenness_agent(
     subgoals.sort(key=lambda x: x[1], reverse=True)
     subgoals = list(list(zip(*subgoals))[0])[:n_options]
 
-    print(f"Subgoals: {subgoals}")
-
     # Train higher-level options.
     if option_training_num_rollouts == 1:
         option_trainer = ValueIterationOptionTrainer(env, stg, gamma=1.0, theta=1e-5, deterministic=True)
@@ -735,9 +744,9 @@ def train_betweenness_agent(
     gc.collect()
 
     # For Debugging - Saves the STG.
-    nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
+    # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
     # quit()
-
+    
     # Generate results.
     # Run Macro-Q Learning Agent
     for run in tqdm(range(num_agents), desc="Betweenness Agent"):
@@ -758,8 +767,9 @@ def train_betweenness_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -773,7 +783,7 @@ def train_betweenness_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -785,7 +795,7 @@ def train_betweenness_agent(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -805,11 +815,12 @@ def train_eigenoptions_agent(
     num_epochs: int,
     epoch_length: int,
     test_episode_cutoff: int,
-    output_directory: str,
+    results_directory: Path,
     pvfs: List[Dict[Hashable, float]],
     stg: nx.DiGraph,
     experiment_id: int,
     training_env_args: Tuple[Type, Dict, str] = None,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Generate a set of skills for "traversing the principal directions of the environment", based on the Eigenoptions
@@ -889,8 +900,9 @@ def train_eigenoptions_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -904,7 +916,7 @@ def train_eigenoptions_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -916,7 +928,7 @@ def train_eigenoptions_agent(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -936,10 +948,11 @@ def train_agent_given_options(
     num_epochs: int,
     epoch_length: int,
     test_episode_cutoff: int,
-    output_directory: str,
+    results_directory: Path,
     experiment_id: int,
     options: List[BaseOption] = None,
     exploration_options: List[BaseOption] = None,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Given an arbitrary set of options, train a Macro-Q/Intra-Option Learning agent using these options.
@@ -1000,8 +1013,9 @@ def train_agent_given_options(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
+            rng = rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -1015,7 +1029,7 @@ def train_agent_given_options(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        train_dir = results_directory / "Train"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -1027,7 +1041,7 @@ def train_agent_given_options(
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -1046,8 +1060,9 @@ def train_primitive_agent(
     num_epochs: int,
     epoch_length: int,
     test_episode_cutoff: int,
-    output_directory: str,
+    results_directory: Path,
     experiment_id: int,
+    rng: Optional[np.random.Generator] = np.random.default_rng(),
 ):
     """
     Train a Macro-Q Learning agent using only primitive options.
@@ -1102,8 +1117,9 @@ def train_primitive_agent(
             intra_option_alpha=alpha,
             gamma=gamma,
             default_action_value=default_action_value,
+            rng=rng,
         )
-        train_results, episode_test_results = agent.run_agent(
+        train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_interval=test_interval,
@@ -1117,7 +1133,10 @@ def train_primitive_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = f"./Training Results/Learning Curves/{env_name}/Train/{output_directory}/"
+        print(f"{results_directory=}")
+        # train_dir = results_directory / "Train"
+        train_dir = results_directory / "Train"
+        print(f"{train_dir=}")
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
@@ -1127,7 +1146,8 @@ def train_primitive_agent(
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
-        episode_test_dir = f"./Training Results/Learning Curves/{env_name}/Episode/{output_directory}/"
+        # episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory / "Test"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
