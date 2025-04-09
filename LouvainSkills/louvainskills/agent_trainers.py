@@ -4,14 +4,11 @@ import uuid
 import copy
 
 import numpy as np
-
 import networkx as nx
-
-import louvainskills.utils.istarmap
 
 from tqdm import tqdm
 from pathlib import Path
-from multiprocessing import Pool
+from typing import Type, Dict, Tuple, List, Hashable, Mapping, Optional
 
 from louvainskills.options import LouvainOption
 from louvainskills.options import SubgoalOption
@@ -20,10 +17,6 @@ from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
 from louvainskills.option_trainers import ValueIterationOptionTrainer
 
 from simpleoptions import BaseOption, PrimitiveOption, OptionAgent
-
-from typing import Type, Dict, Tuple, List, Hashable, Mapping, Optional
-
-from pathlib import Path
 
 
 def generate_aggregate_graphs(
@@ -99,7 +92,7 @@ def train_multi_level_agent(
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         option_training_num_rollouts (int): The number of rollouts to use when training options.
         can_leave_initiation_set (int): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
@@ -135,7 +128,7 @@ def train_multi_level_agent(
         )
 
     options = []
-    for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc=f"Hierachy Level"):
+    for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc="Hierachy Level"):
         options.append([])
 
         # Set available options to options from the previous level of the hierarchy.
@@ -180,7 +173,7 @@ def train_multi_level_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
 
         train_results, episode_test_results, *others = agent.run_agent(
@@ -197,19 +190,19 @@ def train_multi_level_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + "/Train/Multi-Level Agent"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + "/Epoch/Multi-Level Agent"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + "/Episode/Multi-Level Agent"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -256,7 +249,7 @@ def train_single_level_agents(
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         option_training_num_rollouts (int): The number of rollouts to use when training options.
         can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
@@ -292,7 +285,7 @@ def train_single_level_agents(
         )
 
     options = []
-    for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc=f"Hierachy Level"):
+    for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc="Hierachy Level"):
         options.append([])
         for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
             options[level].append(
@@ -329,7 +322,7 @@ def train_single_level_agents(
                 gamma=gamma,
                 n_step_updates=n_step_updates,
                 default_action_value=default_action_value,
-                rng = rng,
+                rng=rng,
             )
             train_results, episode_test_results, *others = agent.run_agent(
                 num_epochs=num_epochs,
@@ -345,19 +338,19 @@ def train_single_level_agents(
             run_id = uuid.uuid1()
 
             # Save training performance.
-            train_dir = results_directory / "Train"
+            train_dir = results_directory + f"/Train/Single-Level Agents/Level {level}"
             Path(train_dir).mkdir(parents=True, exist_ok=True)
             with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
                 json.dump(train_results, f, ensure_ascii=False, indent=4)
 
             # Save epoch-based evaluation performance.
-            # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/Level {level}/"
+            # epoch_test_dir = results_directory + f"/Epoch/Single-Level Agents/Level {level}"
             # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
             # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
-            # Save epoch-based evaluation performance.
-            episode_test_dir = results_directory / "Test"
+            # Save epsiode-based evaluation performance.
+            episode_test_dir = results_directory + f"/Episode/Single-Level Agents/Level {level}"
             Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
             with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
                 json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -404,7 +397,7 @@ def train_flat_agent(
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         option_training_num_rollouts (int): The number of rollouts to use when training options.
         can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
@@ -441,7 +434,7 @@ def train_flat_agent(
         )
 
     options = []
-    for hierarchy_level in tqdm(skill_hierarchy, desc=f"Hierachy Level"):
+    for hierarchy_level in tqdm(skill_hierarchy, desc="Hierachy Level"):
         for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
             options.append(
                 option_trainer.train_option_policy(
@@ -475,7 +468,7 @@ def train_flat_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
         train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
@@ -491,19 +484,19 @@ def train_flat_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + "/Train/Flat Agent"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + "/Epoch/Flat Agent"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + "/Episode/Flat Agent"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -550,7 +543,7 @@ def train_xu_agent(
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         option_training_num_rollouts (int): The number of rollouts to use when training options.
         can_leave_initiation_set (bool): Whether or not agents executing a Louvian option are allowed to leave the initiation set.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs produced by the Louvain algorithm. Only the final one is used.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
@@ -624,7 +617,7 @@ def train_xu_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
         train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
@@ -640,19 +633,19 @@ def train_xu_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + "/Train/Xu"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + "/Epoch/Xu"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + "/Episode/Xu"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -699,7 +692,7 @@ def train_betweenness_agent(
         epoch_length (int): The length of each epoch, in primitive decision stages.
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         option_training_num_rollouts (int): The number of rollouts to use when training options.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         subgoals (List[Hashable]): The subgoals to train options for.
         centralities (Mapping[Hashable, float]): The betweenness centralities of each node in the state-transition graph.
         n_options (int): The number of options to train.
@@ -746,7 +739,7 @@ def train_betweenness_agent(
     # For Debugging - Saves the STG.
     # nx.write_gexf(stg, f"{env_name} Policy Labelled.gexf", prettyprint=True)
     # quit()
-    
+
     # Generate results.
     # Run Macro-Q Learning Agent
     for run in tqdm(range(num_agents), desc="Betweenness Agent"):
@@ -767,7 +760,7 @@ def train_betweenness_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
         train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
@@ -783,19 +776,19 @@ def train_betweenness_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + "/Train/Betweenness"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + "/Epoch/Betweenness"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + "/Episode/Betweenness"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -838,7 +831,7 @@ def train_eigenoptions_agent(
         num_epochs (int): The number of epochs to train the agent for.
         epoch_length (int): The length of each epoch, in primitive decision stages.
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         pvfs (List[Dict[Hashable, float]]): The proto-value functions to train options based on.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
@@ -900,7 +893,7 @@ def train_eigenoptions_agent(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
         train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
@@ -916,19 +909,19 @@ def train_eigenoptions_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + "/Train/Eigenoptions"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + "/Epoch/Eigenoptions"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + "/Episode/Eigenoptions"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -950,6 +943,7 @@ def train_agent_given_options(
     test_episode_cutoff: int,
     results_directory: Path,
     experiment_id: int,
+    agent_type: str,
     options: List[BaseOption] = None,
     exploration_options: List[BaseOption] = None,
     rng: Optional[np.random.Generator] = np.random.default_rng(),
@@ -969,8 +963,9 @@ def train_agent_given_options(
         num_epochs (int): The number of epochs to train the agent for.
         epoch_length (int): The length of each epoch, in primitive decision stages.
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         experiment_id (int): The ID of the experiment being run.
+        agent_type (str): A label to describe the options given to this agent. Used to name the results files.
         options (List[BaseOption], optional): The set of options available for the agent to choose. Defaults to None, in which only primitive options are made available.
         exploration_options (List[BaseOption], optional): The set of options available for the agent to explore using, but not explicitly choose. Defaults to None.
     """
@@ -1013,7 +1008,7 @@ def train_agent_given_options(
             gamma=gamma,
             n_step_updates=n_step_updates,
             default_action_value=default_action_value,
-            rng = rng,
+            rng=rng,
         )
         train_results, episode_test_results, *others = agent.run_agent(
             num_epochs=num_epochs,
@@ -1029,19 +1024,19 @@ def train_agent_given_options(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory / "Train"
+        train_dir = results_directory + f"/Train/{agent_type}"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # epoch_test_dir = results_directory + f"/Epoch/{agent_type}"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory / "Test"
+        episode_test_dir = results_directory + f"/Episode/{agent_type}"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -1078,7 +1073,7 @@ def train_primitive_agent(
         num_epochs (int): The number of epochs to train the agent for.
         epoch_length (int): The length of each epoch, in primitive decision stages.
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
-        output_directory (str): The directory to save the training results in.
+        results_directory (str): The base directory to store results in.
         experiment_id (int): The ID of the experiment being run.
     """
     (EnvironmentType, kwargs, env_name) = environment_args
@@ -1133,21 +1128,19 @@ def train_primitive_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        print(f"{results_directory=}")
-        # train_dir = results_directory / "Train"
-        train_dir = results_directory / "Train"
-        print(f"{train_dir=}")
+        train_dir = results_directory + "/Train/Primitive Agent"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
-        # epoch_test_dir = f"./Training Results/Learning Curves/{env_name}/Epoch/{output_directory}/"
+        # Save epoch-based evaluation performance.
+        # epoch_test_dir = results_directory + "Epoch/Primitive Agent"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
-        # episode_test_dir = results_directory / "Test"
-        episode_test_dir = results_directory / "Test"
+        # Save episode-based evaluation performance.
+        episode_test_dir = results_directory + "/Episode/Primitive Agent"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
