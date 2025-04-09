@@ -1,6 +1,6 @@
 import random
 
-from simpleenvs.envs.taxi import TaxiEnvironment
+from simpleenvs.envs.playroom import PlayroomEnvironment
 
 from louvainskills.agent_trainers import (
     generate_aggregate_graphs,
@@ -21,16 +21,16 @@ from louvainskills.eigenoptions import derive_pvfs
 
 resolution = 0.05
 epsilon = 0.1
-alpha = 0.4
+alpha = 0.1
 gamma = 1.0
 default_action_value = 0.0
 n_step_updates = True
 num_agents = 10
 test_interval = 2
-num_epochs = 800
+num_epochs = 500
 epoch_length = 100
 test_episode_cutoff = 60
-option_training_num_rollouts = 1
+option_training_num_rollouts = 10_000
 can_leave_initiation_set = False
 results_directory = "./Training Results/Learning Curves/Taxi"
 
@@ -38,9 +38,9 @@ results_directory = "./Training Results/Learning Curves/Taxi"
 for i in range(1):
     experiment_id = random.randrange(10000)
 
-    EnvironmentType = TaxiEnvironment
+    EnvironmentType = PlayroomEnvironment
     kwargs = {}
-    env_name = "Taxi"
+    env_name = "Playroom"
 
     # We need to do a bit of legwork to make sure the same sequence
     # of initial states are used across each type of agent.
@@ -55,7 +55,7 @@ for i in range(1):
     aggregate_graphs, stg = generate_aggregate_graphs(
         environment_args,
         apply_louvain,
-        {"resolution": resolution, "return_aggregate_graphs": True, "first_levels_to_skip": 1},
+        {"resolution": resolution, "return_aggregate_graphs": True, "first_levels_to_skip": 0},
     )
 
     # Q-Learning with Primitives
@@ -159,24 +159,24 @@ for i in range(1):
     )
 
     # Eigenoptions
-    pvfs, eig_stg = derive_pvfs(stg, 16)
-    train_eigenoptions_agent(
-        environment_args=environment_args,
-        epsilon=epsilon,
-        alpha=alpha,
-        gamma=gamma,
-        default_action_value=default_action_value,
-        n_step_updates=n_step_updates,
-        num_agents=num_agents,
-        test_interval=test_interval,
-        num_epochs=num_epochs,
-        epoch_length=epoch_length,
-        test_episode_cutoff=test_episode_cutoff,
-        results_directory=results_directory,
-        pvfs=pvfs,
-        stg=eig_stg,
-        experiment_id=experiment_id,
-    )
+    # pvfs, eig_stg = derive_pvfs(stg, 16)
+    # train_eigenoptions_agent(
+    #     environment_args=environment_args,
+    #     epsilon=epsilon,
+    #     alpha=alpha,
+    #     gamma=gamma,
+    #     default_action_value=default_action_value,
+    #     n_step_updates=n_step_updates,
+    #     num_agents=num_agents,
+    #     test_interval=test_interval,
+    #     num_epochs=num_epochs,
+    #     epoch_length=epoch_length,
+    #     test_episode_cutoff=test_episode_cutoff,
+    #     results_directory=results_directory,
+    #     pvfs=pvfs,
+    #     stg=eig_stg,
+    #     experiment_id=experiment_id,
+    # )
 
     # Node Betweenness Subgoal Skills
     centralities, subgoals = apply_node_betweenness(stg)

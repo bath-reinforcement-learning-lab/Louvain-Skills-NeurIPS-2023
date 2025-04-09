@@ -13,6 +13,7 @@ from louvainskills.agent_trainers import (
     train_multi_level_agent,
     train_single_level_agents,
     train_flat_agent,
+    train_xu_agent,
     train_betweenness_agent,
     train_eigenoptions_agent,
     train_primitive_agent,
@@ -34,9 +35,11 @@ num_agents = 10
 test_interval = 1
 num_epochs = 100
 epoch_length = 100
-test_episode_cutoff = 500
+test_episode_cutoff = 40
 option_training_num_rollouts = 1
 can_leave_initiation_set = False
+results_directory = "./Training Results/Learning Curves/Rooms"
+
 
 for j, TargetEnvironmentType in enumerate(
     [
@@ -44,7 +47,7 @@ for j, TargetEnvironmentType in enumerate(
         DiscreteXuFourRoomsTRBL,
     ]
 ):
-    for i in range(25):
+    for i in range(1):
         # Define goal environment that we're deriving skills from.
         experiment_id = random.randrange(10000)
         GoalEnvironmentType = ExplorableXuFourRooms
@@ -75,7 +78,7 @@ for j, TargetEnvironmentType in enumerate(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
-            output_directory="Primitive Agent",
+            results_directory=results_directory,
             experiment_id=experiment_id,
         )
 
@@ -94,7 +97,7 @@ for j, TargetEnvironmentType in enumerate(
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
-            output_directory="Multi-Level Agent",
+            results_directory=results_directory,
             aggregate_graphs=aggregate_graphs,
             stg=stg,
             experiment_id=experiment_id,
@@ -115,7 +118,7 @@ for j, TargetEnvironmentType in enumerate(
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
-            output_directory="Single-Level Agents",
+            results_directory=results_directory,
             aggregate_graphs=aggregate_graphs,
             stg=stg,
             experiment_id=experiment_id,
@@ -136,7 +139,28 @@ for j, TargetEnvironmentType in enumerate(
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
-            output_directory="Flat Agent",
+            results_directory=results_directory,
+            aggregate_graphs=aggregate_graphs,
+            stg=stg,
+            experiment_id=experiment_id,
+        )
+
+        # Xu et al. (2018)
+        train_xu_agent(
+            environment_args=environment_args,
+            epsilon=epsilon,
+            alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+            n_step_updates=n_step_updates,
+            num_agents=num_agents,
+            test_interval=test_interval,
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
+            can_leave_initiation_set=can_leave_initiation_set,
+            results_directory=results_directory,
             aggregate_graphs=aggregate_graphs,
             stg=stg,
             experiment_id=experiment_id,
@@ -156,7 +180,7 @@ for j, TargetEnvironmentType in enumerate(
             num_epochs=num_epochs,
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
-            output_directory="Eigenoptions",
+            results_directory=results_directory,
             pvfs=pvfs,
             stg=eig_stg,
             experiment_id=experiment_id,
@@ -177,7 +201,7 @@ for j, TargetEnvironmentType in enumerate(
             epoch_length=epoch_length,
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
-            output_directory="Betweenness",
+            results_directory=results_directory,
             subgoals=subgoals,
             centralities=centralities,
             n_options=len(subgoals),
@@ -202,7 +226,7 @@ for j, TargetEnvironmentType in enumerate(
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
-            output_directory="Label Propagation",
+            results_directory=results_directory,
             aggregate_graphs=aggregate_graph,
             stg=stg,
             experiment_id=experiment_id,
@@ -224,7 +248,7 @@ for j, TargetEnvironmentType in enumerate(
             test_episode_cutoff=test_episode_cutoff,
             option_training_num_rollouts=option_training_num_rollouts,
             can_leave_initiation_set=can_leave_initiation_set,
-            output_directory="Edge Betweenness",
+            results_directory=results_directory,
             aggregate_graphs=aggregate_graph,
             stg=stg,
             experiment_id=experiment_id,
