@@ -16,7 +16,6 @@ from louvainskills.agent_trainers import (
     train_xu_agent,
     train_betweenness_agent,
     train_eigenoptions_agent,
-    train_agent_given_options,
     train_primitive_agent,
 )
 
@@ -105,6 +104,48 @@ for j, TargetEnvironmentType in enumerate(
 
         # Xu et al. (2018)
         train_xu_agent(
+            environment_args=environment_args,
+            epsilon=epsilon,
+            alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+            n_step_updates=n_step_updates,
+            num_agents=num_agents,
+            test_interval=test_interval,
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
+            can_leave_initiation_set=can_leave_initiation_set,
+            results_directory=results_directory,
+            aggregate_graphs=aggregate_graphs,
+            stg=stg,
+            experiment_id=experiment_id,
+        )
+
+        # Individual Level Louvain Skills
+        train_single_level_agents(
+            environment_args=environment_args,
+            epsilon=epsilon,
+            alpha=alpha,
+            gamma=gamma,
+            default_action_value=default_action_value,
+            n_step_updates=n_step_updates,
+            num_agents=num_agents,
+            test_interval=test_interval,
+            num_epochs=num_epochs,
+            epoch_length=epoch_length,
+            test_episode_cutoff=test_episode_cutoff,
+            option_training_num_rollouts=option_training_num_rollouts,
+            can_leave_initiation_set=can_leave_initiation_set,
+            results_directory=results_directory,
+            aggregate_graphs=aggregate_graphs,
+            stg=stg,
+            experiment_id=experiment_id,
+        )
+
+        # Two-Level/Flat Louvain Skills
+        train_flat_agent(
             environment_args=environment_args,
             epsilon=epsilon,
             alpha=alpha,
