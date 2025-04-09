@@ -1,34 +1,38 @@
-# Set your current working directory to this script's location.
-
 library("rjson")
-library("here")
+library("rstudioapi")
 
-here()
+setwd(dirname(getActiveDocumentContext()$path))
 
 path <- getwd()
 options(digits = 3)
 dosave <- T
 max_epoch = 60
+n_runs = 40
+time_interval = 1
+
+evaluation_type = "Episode"
+input_file = sprintf("rooms_%s.json", evaluation_type)
+output_file = "rooms_alt.pdf"
 
 ### get the data
-dataj <- fromJSON(file="rooms.json")
-means_louvain <- dataj$louvain$mean[1:max_epoch]
-sd_louvain <- dataj$`louvain`$std_dev[1:max_epoch] / sqrt(40)
+dataj <- fromJSON(file=input_file)
+means_louvain <- dataj$louvain$mean[1:(max_epoch / time_interval)]
+sd_louvain <- dataj$`louvain`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_prim <- dataj$primitive$mean[1:max_epoch]
-sd_prim <- dataj$primitive$std_dev[1:max_epoch] / sqrt(40)
+means_prim <- dataj$primitive$mean[1:(max_epoch / time_interval)]
+sd_prim <- dataj$primitive$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_flatlouvain <- dataj$`louvain_flat`$mean[1:max_epoch]
-sd_flatlouvain <- dataj$`louvain_flat`$std_dev[1:max_epoch] / sqrt(40)
+means_flatlouvain <- dataj$`louvain_flat`$mean[1:(max_epoch / time_interval)]
+sd_flatlouvain <- dataj$`louvain_flat`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_level1 <- dataj$`level_1`$mean[1:max_epoch]
-sd_level1 <- dataj$`level_1`$std_dev[1:max_epoch] / sqrt(40)
+means_level1 <- dataj$`level_1`$mean[1:(max_epoch / time_interval)]
+sd_level1 <- dataj$`level_1`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_level2 <- dataj$`level_2`$mean[1:max_epoch]
-sd_level2 <- dataj$`level_2`$std_dev[1:max_epoch] / sqrt(40)
+means_level2 <- dataj$`level_2`$mean[1:(max_epoch / time_interval)]
+sd_level2 <- dataj$`level_2`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_level3 <- dataj$`level_3`$mean[1:max_epoch]
-sd_level3 <- dataj$`level_3`$std_dev[1:max_epoch] / sqrt(40)
+means_level3 <- dataj$`level_3`$mean[1:(max_epoch / time_interval)]
+sd_level3 <- dataj$`level_3`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 ######
 
 # compute confidence intervals
@@ -44,13 +48,14 @@ cip_y_level3 <- c(means_level3 - sd_level3, rev(means_level3 + sd_level3))
 # to make polygon where coordinates start with lower limit and then upper limit in reverse order
 # polygon(ci_x,ci_y, col = "grey75", border = FALSE)
 
-if (dosave) pdf(paste("rooms_alt", ".pdf",sep=""), width = 5, height = 4.25)
+if (dosave) pdf(output_file, width = 5, height = 4.25)
 par(family="serif", mar=c(3.5, 3.5, 1.5, 0) + 0.5, mgp=c(2.5, 1, 0))
 plot.new()
-plot.window(ylim=c(-0.5, 1.0), xlim=c(0,80))
-xlabels = c(15, 30, 45, 60)
+plot.window(ylim=c(-0.1, 1.0), xlim=c(0,60))
+xlabels = c(10, 20, 30, 40, 50, 60)
+ylabels = c(0.0, 0.5, 1.0)
 axis(1, at=xlabels, labels=xlabels, cex.axis=1.7)
-axis(2, cex.axis=1.7)
+axis(2, at=ylabels, labels=ylabels, cex.axis=1.7)
 title(main=paste("Rooms"), cex.main=2.0, font.main=1)
 title(xlab="Epoch", cex.lab=2.0)
 title(ylab="Return", cex.lab=2.0)
@@ -90,7 +95,7 @@ nice_names <- c("Louvain",
                 "Primitive")
 
 ii <- c(1, 2, 3, 4, 5, 6, 7)
-legend(49, -0.35, nice_names[ii], col=c("red", "darkred", "mediumpurple4", "mediumpurple2", "mediumorchid2", "orchid1", "grey30"),
+legend(36, -0.1, nice_names[ii], col=c("red", "darkred", "mediumpurple4", "mediumpurple2", "mediumorchid2", "orchid1", "grey30"),
        bg = adjustcolor("white", alpha.f=0.7), pch=16, xjust=0, yjust=0, cex=1.3)
 
 if (dosave) dev.off()

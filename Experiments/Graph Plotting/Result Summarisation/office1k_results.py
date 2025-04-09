@@ -3,7 +3,7 @@ from pathlib import Path
 
 from summary_statistics import compute_statistics_for_directories
 
-for eval_type in ["Episode", "Epoch"]:
+for eval_type in ["Episode"]:
 
     directories = [
         f"./Training Results/Learning Curves/office_1k/{eval_type}/Primitive Agent/",
@@ -11,6 +11,7 @@ for eval_type in ["Episode", "Epoch"]:
         f"./Training Results/Learning Curves/office_1k/{eval_type}/Betweenness/",
         f"./Training Results/Learning Curves/office_1k/{eval_type}/Label Propagation/",
         f"./Training Results/Learning Curves/office_1k/{eval_type}/Eigenoptions/",
+        f"./Training Results/Learning Curves/office_1k/{eval_type}/Xu/",
     ]
 
     labels = [
@@ -19,6 +20,7 @@ for eval_type in ["Episode", "Epoch"]:
         "node_betweenness",
         "label_prop",
         "eigenoptions",
+        "xu",
     ]
 
     # Compute summary statistics.

@@ -7,12 +7,17 @@ def compute_statistics(folder_path):
     arrays = []
 
     # Read all .json files in the folder.
+
     for filename in os.listdir(folder_path):
         if filename.endswith(".json"):
-            file_path = os.path.join(folder_path, filename)
-            with open(file_path) as f:
-                data = json.load(f)
-                arrays.append(data)
+            try:
+                file_path = os.path.join(folder_path, filename)
+                with open(file_path) as f:
+                    data = json.load(f)
+                    arrays.append(data)
+            except:
+                print(f"Error reading {file_path}.")
+                quit()
 
     # Convert list of arrays to a numpy array for easier computation.
     arrays = np.array(arrays)

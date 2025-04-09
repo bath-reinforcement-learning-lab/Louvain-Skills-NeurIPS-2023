@@ -7,10 +7,10 @@ for reward_type in ["binary"]:
     for eval_type in ["Episode"]:
 
         directories = [
-            f"./Training Results/Learning Curves/office_10k_{reward_type}/{eval_type}/Primitive Agent/",
-            f"./Training Results/Learning Curves/office_10k_{reward_type}/{eval_type}/Multi-Level Agent/",
-            f"./Training Results/Learning Curves/office_10k_{reward_type}/{eval_type}/Betweenness/",
-            f"./Training Results/Learning Curves/office_10k_{reward_type}/{eval_type}/Label Propagation/",
+            f"./Training Results/Learning Curves/office_20k_{reward_type}/{eval_type}/Primitive Agent/",
+            f"./Training Results/Learning Curves/office_20k_{reward_type}/{eval_type}/Multi-Level Agent/",
+            f"./Training Results/Learning Curves/office_20k_{reward_type}/{eval_type}/Betweenness/",
+            f"./Training Results/Learning Curves/office_20k_{reward_type}/{eval_type}/Label Propagation/",
         ]
 
         labels = [
@@ -24,9 +24,9 @@ for reward_type in ["binary"]:
         results_dict = compute_statistics_for_directories(directories, labels)
 
         # Ensure the output directory exists.
-        OUTPUT_DIRECTORY = "./Experiments/Graph Plotting/R Plots/Office 10k/"
+        OUTPUT_DIRECTORY = "./Experiments/Graph Plotting/R Plots/Office 20k/"
         Path(OUTPUT_DIRECTORY).mkdir(parents=True, exist_ok=True)
 
         # Save the results to a .json file. Pretty print.
-        with open(OUTPUT_DIRECTORY + f"office10k_{reward_type}_{eval_type}.json", "w") as f:
+        with open(OUTPUT_DIRECTORY + f"office20k_{reward_type}_{eval_type}.json", "w") as f:
             json.dump(results_dict, f, indent=4)

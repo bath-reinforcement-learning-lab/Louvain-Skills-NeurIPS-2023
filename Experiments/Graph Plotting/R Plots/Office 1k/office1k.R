@@ -1,35 +1,39 @@
-# Set your current working directory to this script's location.
-
 library("rjson")
-library("here")
+library("rstudioapi")
 
-here()
+setwd(dirname(getActiveDocumentContext()$path))
 
 path <- getwd()
 options(digits = 3)
 dosave <- T
-max_epoch = 200
+max_epoch = 300
+n_runs = 40
+time_interval = 5
+
+evaluation_type = "Episode"
+input_file = sprintf("office1k_%s.json", evaluation_type)
+output_file = "office1k.pdf"
 
 ### get the data
-dataj <- fromJSON(file="office1k.json")
-means_louvain <- dataj$louvain$mean[1:max_epoch]
-sd_louvain <- dataj$`louvain`$std_dev[1:max_epoch] / sqrt(10)
+dataj <- fromJSON(file=input_file)
+means_louvain <- dataj$louvain$mean[1:(max_epoch / time_interval)]
+sd_louvain <- dataj$`louvain`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_prim <- dataj$primitive$mean[1:max_epoch]
-sd_prim <- dataj$primitive$std_dev[1:max_epoch] / sqrt(10)
+means_prim <- dataj$primitive$mean[1:(max_epoch / time_interval)]
+sd_prim <- dataj$primitive$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_labelprop <- dataj$`label_prop`$mean[1:max_epoch]
-sd_labelprop <- dataj$`label_prop`$std_dev[1:max_epoch] / sqrt(10)
+means_labelprop <- dataj$`label_prop`$mean[1:(max_epoch / time_interval)]
+sd_labelprop <- dataj$`label_prop`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_nodebet <- dataj$`node_betweenness`$mean[1:max_epoch]
-sd_nodebet <- dataj$`node_betweenness`$std_dev[1:max_epoch] / sqrt(10)
+means_nodebet <- dataj$`node_betweenness`$mean[1:(max_epoch / time_interval)]
+sd_nodebet <- dataj$`node_betweenness`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_eigen <- dataj$eigenoptions$mean[1:max_epoch]
-sd_eigen <- dataj$eigenoptions$std_dev[1:max_epoch] / sqrt(10)
+means_eigen <- dataj$eigenoptions$mean[1:(max_epoch / time_interval)]
+sd_eigen <- dataj$eigenoptions$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 ######
 
 # compute confidence intervals
-x <- 1:max_epoch
+x <- seq(1, max_epoch, by=time_interval)
 cip_x <- c(x, rev(x))
 cip_y_louvain <- c(means_louvain - sd_louvain, rev(means_louvain + sd_louvain))
 cip_y_prim <- c(means_prim - sd_prim, rev(means_prim + sd_prim))
@@ -40,11 +44,11 @@ cip_y_eigen <- c(means_eigen - sd_eigen, rev(means_eigen + sd_eigen))
 # to make polygon where coordinates start with lower limit and then upper limit in reverse order
 # polygon(ci_x,ci_y, col = "grey75", border = FALSE)
 
-if (dosave) pdf(paste("office1k", ".pdf",sep=""), width = 5, height = 4.25)
+if (dosave) pdf(output_file, width = 5, height = 4.25)
 par(family="serif", mar=c(3.5, 3.5, 1.5, 0) + 0.5, mgp=c(2.5, 1, 0))
 plot.new()
-plot.window(ylim=c(-0.1, 1.0), xlim=c(0,200))
-xlabels = c(0, 50, 100, 150, 200)
+plot.window(ylim=c(-0.1, 1.0), xlim=c(0,300))
+xlabels = c(0, 100, 200, 300)
 axis(1, at=xlabels, labels=xlabels, cex.axis=1.7)
 ylabels <- c(0, 0.5, 1)
 axis(2, at=ylabels, labels=ylabels, cex.axis=1.7)

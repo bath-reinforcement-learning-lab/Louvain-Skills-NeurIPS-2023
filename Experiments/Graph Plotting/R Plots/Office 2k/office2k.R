@@ -1,36 +1,39 @@
-# Set your current working directory to this script's location.
-
 library("rjson")
-library("here")
+library("rstudioapi")
 
-here()
+setwd(dirname(getActiveDocumentContext()$path))
 
 path <- getwd()
 options(digits = 3)
 dosave <- T
-max_epoch = 500
+max_epoch = 1000
 n_runs = 10
+time_interval = 5
+
+evaluation_type = "Episode"
+input_file = sprintf("office2k_binary_%s.json", evaluation_type)
+output_file = "office2k.pdf"
 
 ### get the data
-dataj <- fromJSON(file="office2k.json")
-means_louvain <- dataj$louvain$mean[1:max_epoch]
-sd_louvain <- dataj$`louvain`$std_dev[1:max_epoch] / sqrt(n_runs)
+dataj <- fromJSON(file=input_file)
+means_louvain <- dataj$louvain$mean[1:(max_epoch / time_interval)]
+sd_louvain <- dataj$`louvain`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_prim <- dataj$primitive$mean[1:max_epoch]
-sd_prim <- dataj$primitive$std_dev[1:max_epoch] / sqrt(n_runs)
+means_prim <- dataj$primitive$mean[1:(max_epoch / time_interval)]
+sd_prim <- dataj$primitive$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_labelprop <- dataj$`label_prop`$mean[1:max_epoch]
-sd_labelprop <- dataj$`label_prop`$std_dev[1:max_epoch] / sqrt(n_runs)
+means_labelprop <- dataj$`label_prop`$mean[1:(max_epoch / time_interval)]
+sd_labelprop <- dataj$`label_prop`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_nodebet <- dataj$`node_betweenness`$mean[1:max_epoch]
-sd_nodebet <- dataj$`node_betweenness`$std_dev[1:max_epoch] / sqrt(n_runs)
+means_nodebet <- dataj$`node_betweenness`$mean[1:(max_epoch / time_interval)]
+sd_nodebet <- dataj$`node_betweenness`$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 #
-means_eigen <- dataj$eigenoptions$mean[1:max_epoch]
-sd_eigen <- dataj$eigenoptions$std_dev[1:max_epoch] / sqrt(n_runs)
+means_eigen <- dataj$eigenoptions$mean[1:(max_epoch / time_interval)]
+sd_eigen <- dataj$eigenoptions$std_dev[1:(max_epoch / time_interval)] / sqrt(n_runs)
 ######
 
 # compute confidence intervals
-x <- 1:max_epoch
+x <- seq(1, max_epoch, by=time_interval)
 cip_x <- c(x, rev(x))
 cip_y_louvain <- c(means_louvain - sd_louvain, rev(means_louvain + sd_louvain))
 cip_y_prim <- c(means_prim - sd_prim, rev(means_prim + sd_prim))
@@ -41,13 +44,13 @@ cip_y_eigen <- c(means_eigen - sd_eigen, rev(means_eigen + sd_eigen))
 # to make polygon where coordinates start with lower limit and then upper limit in reverse order
 # polygon(ci_x,ci_y, col = "grey75", border = FALSE)
 
-if (dosave) pdf(paste("office2k", ".pdf",sep=""), width = 5, height = 4.25)
+if (dosave) pdf(output_file, width = 5, height = 4.25)
 par(family="serif", mar=c(3.5, 3.5, 1.5, 0) + 0.5, mgp=c(2.5, 1, 0))
 plot.new()
-plot.window(ylim=c(-0.1, 1.0), xlim=c(0,500))
-xlabels = c(0, 100, 200, 300, 400, 500)
+plot.window(ylim=c(-1.5, 0.7), xlim=c(0, max_epoch + 25))
+xlabels = c(0, 250, 500, 750, 1000)
 axis(1, at=xlabels, labels=xlabels, cex.axis=1.7)
-ylabels <- c(0, 0.5, 1)
+ylabels <- c(-1.5, -1.0, -0.5, 0, 0.5)
 axis(2, at=ylabels, labels=ylabels, cex.axis=1.7)
 title(main=paste("Office (2k)"), cex.main=2.0, font.main=1)
 title(xlab="Epoch", cex.lab=2.0)
@@ -77,5 +80,16 @@ lines(x, means_nodebet, col = "navy", xpd=T)
 points(x, means_eigen, col = "orange", pch = 16, xpd=T)
 lines(x, means_eigen, col = "orange", xpd=T)
 
+nice_names <- c("Louvain",
+               "Eigenoptions",
+               "Label Prop.",
+               "Node Bet.",
+               "Primitive")
+
+ii <- c(1, 2, 3, 4, 5)
+legend(575, -1.1, nice_names[ii], col=c("red", "orange", "forestgreen", "navy", "grey30"),
+       bg = adjustcolor("white", alpha.f=0.7), pch=16, xjust=0, yjust=0, cex=1.3)
+
+text(x = 700, y = -1.25, labels = "-0.01 per action\n+1.0 at goal", font = 2, adj = 0)
 
 if (dosave) dev.off()
