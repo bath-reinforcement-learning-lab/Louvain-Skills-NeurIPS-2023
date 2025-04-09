@@ -1,22 +1,18 @@
-# TODO: CAN WE EXTRACT THE "LENGTH" DATA FROM THE BINARY DATA?
+# TODO: Randomly select start and goal rooms (like in the larger office experiments).
 
-import os
-
-os.environ["OMP_NUM_THREADS"] = "2"  # export OMP_NUM_THREADS=2
-os.environ["OPENBLAS_NUM_THREADS"] = "2"  # export OPENBLAS_NUM_THREADS=2
-os.environ["MKL_NUM_THREADS"] = "2"  # export MKL_NUM_THREADS=2
-os.environ["VECLIB_MAXIMUM_THREADS"] = "2"  # export VECLIB_MAXIMUM_THREADS=2
-os.environ["NUMEXPR_NUM_THREADS"] = "2"  # export NUMEXPR_NUM_THREADS=2
-
+import json
 import random
 
 from officeworld import OfficeWorldEnvironment
 from officeworld.utils.serialisation import OfficeBuildingJSONHandler
 
+
 from louvainskills.agent_trainers import (
     generate_aggregate_graphs,
     train_multi_level_agent,
+    train_single_level_agents,
     train_flat_agent,
+    train_xu_agent,
     train_betweenness_agent,
     train_eigenoptions_agent,
     train_primitive_agent,
@@ -37,21 +33,19 @@ num_agents = 20
 test_interval = 5
 num_epochs = 1000
 epoch_length = 1000
-test_episode_cutoff = 150
+test_episode_cutoff = 100
 option_training_num_rollouts = 1
 can_leave_initiation_set = False
 results_directory = "./Training Results/Learning Curves/Office1k"
-
 
 # Read office file and extract useful metadata.
 office_name = "office_1k"
 office = OfficeBuildingJSONHandler.load_from_json(f"./Experiments/Learning Curves/{office_name}/{office_name}.json")
 office_rooms = office.rooms
-num_floors = len(office.layout)
 
 # Randomly choose a start and goal room.
-start_floor = random.randint(0, num_floors - 1)
-goal_floor = random.randint(0, num_floors - 1)
+start_floor = 0
+goal_floor = 0
 start_room = None
 goal_room = None
 while start_room == goal_room:
@@ -73,16 +67,16 @@ kwargs = {
     "goal_floor": goal_floor,
     "start_room": start_room,
     "goal_room": goal_room,
-    "movement_penalty": -0.01,
+    "movement_penalty": -0.001,
     "goal_reward": 1.0,
 }
 environment_args = (OfficeWorldEnvironment, kwargs, env_name)
 
-for i in range(2):
+for i in range(1):
     experiment_id = random.randrange(10000)
 
     aggregate_graphs, stg = generate_aggregate_graphs(
-        explorable_environment_args,
+        environment_args,
         apply_louvain,
         {"resolution": resolution, "return_aggregate_graphs": True, "first_levels_to_skip": 1},
     )
@@ -124,8 +118,71 @@ for i in range(2):
         experiment_id=experiment_id,
     )
 
+    # Individual Level Louvain Skills
+    train_single_level_agents(
+        environment_args=environment_args,
+        epsilon=epsilon,
+        alpha=alpha,
+        gamma=gamma,
+        default_action_value=default_action_value,
+        n_step_updates=n_step_updates,
+        num_agents=num_agents,
+        test_interval=test_interval,
+        num_epochs=num_epochs,
+        epoch_length=epoch_length,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
+        can_leave_initiation_set=can_leave_initiation_set,
+        results_directory=results_directory,
+        aggregate_graphs=aggregate_graphs,
+        stg=stg,
+        experiment_id=experiment_id,
+    )
+
+    # Xu et al. (2018)
+    train_xu_agent(
+        environment_args=environment_args,
+        epsilon=epsilon,
+        alpha=alpha,
+        gamma=gamma,
+        default_action_value=default_action_value,
+        n_step_updates=n_step_updates,
+        num_agents=num_agents,
+        test_interval=test_interval,
+        num_epochs=num_epochs,
+        epoch_length=epoch_length,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
+        can_leave_initiation_set=can_leave_initiation_set,
+        results_directory=results_directory,
+        aggregate_graphs=aggregate_graphs,
+        stg=stg,
+        experiment_id=experiment_id,
+    )
+
+    # Two-Level/Flat Louvain Skills
+    train_flat_agent(
+        environment_args=environment_args,
+        epsilon=epsilon,
+        alpha=alpha,
+        gamma=gamma,
+        default_action_value=default_action_value,
+        n_step_updates=n_step_updates,
+        num_agents=num_agents,
+        test_interval=test_interval,
+        num_epochs=num_epochs,
+        epoch_length=epoch_length,
+        test_episode_cutoff=test_episode_cutoff,
+        option_training_num_rollouts=option_training_num_rollouts,
+        can_leave_initiation_set=can_leave_initiation_set,
+        results_directory=results_directory,
+        aggregate_graphs=aggregate_graphs,
+        stg=stg,
+        experiment_id=experiment_id,
+    )
+
     # Eigenoptions
-    pvfs, eig_stg = derive_pvfs(stg, 64)
+    pvfs, eig_stg = derive_pvfs(stg, 32)
     train_eigenoptions_agent(
         environment_args=environment_args,
         epsilon=epsilon,
@@ -163,13 +220,13 @@ for i in range(2):
         subgoals=subgoals,
         centralities=centralities,
         n_options=len(subgoals),
-        initiation_set_size=128,
+        initiation_set_size=30,
         stg=stg,
         experiment_id=experiment_id,
     )
 
     # Label Propagation Skills
-    aggregate_graph, stg = generate_aggregate_graphs(explorable_environment_args, apply_label_propagation)
+    aggregate_graph, stg = generate_aggregate_graphs(environment_args, apply_label_propagation)
     train_flat_agent(
         environment_args=environment_args,
         epsilon=epsilon,
