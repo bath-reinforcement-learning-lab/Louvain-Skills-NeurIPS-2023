@@ -188,4 +188,5 @@ for i in range(2):
         aggregate_graphs=aggregate_graph,
         stg=stg,
         experiment_id=experiment_id,
+        agent_type="Label Propagation",
     )

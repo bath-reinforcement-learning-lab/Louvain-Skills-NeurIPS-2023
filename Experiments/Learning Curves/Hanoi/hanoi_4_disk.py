@@ -255,6 +255,7 @@ for j, target_env_args in enumerate(target_envs_args_list):
             aggregate_graphs=aggregate_graph,
             stg=stg,
             experiment_id=experiment_id,
+            agent_type="Label Propagation",
         )
 
         # Edge Betweenness Skills
@@ -277,4 +278,5 @@ for j, target_env_args in enumerate(target_envs_args_list):
             aggregate_graphs=aggregate_graph,
             stg=stg,
             experiment_id=experiment_id,
+            agent_type="Edge Betweenness",
         )

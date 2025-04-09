@@ -213,6 +213,7 @@ for i in range(1):
         aggregate_graphs=aggregate_graph,
         stg=stg,
         experiment_id=experiment_id,
+        agent_type="Label Propagation",
     )
 
     # Edge Betweenness Skills
@@ -235,4 +236,5 @@ for i in range(1):
         aggregate_graphs=aggregate_graph,
         stg=stg,
         experiment_id=experiment_id,
+        agent_type="Edge Betweenness",
     )

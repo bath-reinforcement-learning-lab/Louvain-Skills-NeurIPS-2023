@@ -377,6 +377,7 @@ def train_flat_agent(
     stg: nx.DiGraph,
     experiment_id: int,
     rng: Optional[np.random.Generator] = np.random.default_rng(),
+    agent_type: str = None,
 ):
     """
     Generate a single-level hierarchy of Louvain options and use them to train a Macro-Q/Intra-Option Learning agent.
@@ -401,6 +402,7 @@ def train_flat_agent(
         aggregate_graphs (List[nx.DiGraph]): A list of aggregate graphs representing the hierarchy of skills to train.
         stg (nx.DiGraph): The state-transition graph of the environment.
         experiment_id (int): The ID of the experiment being run.
+        agent_type (str): A label to describe the options given to this agent. Used to name the results files. Optional.
     """
 
     (EnvironmentType, kwargs, env_name) = environment_args
@@ -484,19 +486,28 @@ def train_flat_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory + "/Train/Flat Agent"
+        if agent_type is None:
+            train_dir = results_directory + "/Train/Flat Agent"
+        else:
+            train_dir = results_directory + f"/Train/{agent_type}"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = results_directory + "/Epoch/Flat Agent"
+        # if agent_type is None:
+        #     epoch_test_dir = results_directory + "/Epoch/Flat Agent"
+        # else:
+        #     epoch_test_dir = results_directory + f"/Epoch/{agent_type}"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory + "/Episode/Flat Agent"
+        if agent_type is None:
+            episode_test_dir = results_directory + "/Episode/Flat Agent"
+        else:
+            episode_test_dir = results_directory + f"/Episode/{agent_type}"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
@@ -965,7 +976,7 @@ def train_agent_given_options(
         test_episode_cutoff (int): The number of primitive decision stages after which a test episode is cut off.
         results_directory (str): The base directory to store results in.
         experiment_id (int): The ID of the experiment being run.
-        agent_type (str): A label to describe the options given to this agent. Used to name the results files.
+        agent_type (str): A label to describe the options given to this agent. Used to name the results files. Optional.
         options (List[BaseOption], optional): The set of options available for the agent to choose. Defaults to None, in which only primitive options are made available.
         exploration_options (List[BaseOption], optional): The set of options available for the agent to explore using, but not explicitly choose. Defaults to None.
     """
