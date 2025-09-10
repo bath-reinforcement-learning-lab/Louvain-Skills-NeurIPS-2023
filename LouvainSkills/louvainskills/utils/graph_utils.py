@@ -94,3 +94,21 @@ def _nx_name_present(stg):
         if "_nx_name" not in stg.nodes[node]:
             return False
     return True
+
+
+def compress_cluster_labels(graph: nx.Graph, cluster_attr: str) -> nx.Graph:
+    """
+    Relabels nodes so that cluster labels form a contiguous range of integers.
+
+    Args:
+        graph (nx.Graph): The input graph with cluster labels.
+
+    Returns:
+        nx.Graph: The graph with compressed cluster labels.
+    """
+    clusters = nx.get_node_attributes(graph, cluster_attr)
+    unique_ids = sorted(set(clusters.values()))
+    id_map = {old: new for new, old in enumerate(unique_ids)}
+    relabelled = {node: id_map[cid] for node, cid in clusters.items()}
+    nx.set_node_attributes(graph, relabelled, cluster_attr)
+    return graph
