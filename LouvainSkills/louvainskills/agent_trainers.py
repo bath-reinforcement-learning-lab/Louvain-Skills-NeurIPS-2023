@@ -534,6 +534,7 @@ def train_xu_agent(
     stg: nx.DiGraph,
     experiment_id: int,
     rng: Optional[np.random.Generator] = np.random.default_rng(),
+    agent_type: str = None,
 ):
     """
     Generate a single-level skill heirarchy based on the final (i.e., highest-level) partition of the state-transition graph
@@ -610,7 +611,7 @@ def train_xu_agent(
 
     # Generate results.
     # Run Macro-Q Learning Agent
-    for run in tqdm(range(num_agents), desc="Xu et. al (2018) Agent"):
+    for run in tqdm(range(num_agents), desc="Xu et. al (2018) Agent" if agent_type is None else agent_type):
         # Initialise our environment.
         env = EnvironmentType(**kwargs)
         env.set_options(options)
@@ -644,19 +645,28 @@ def train_xu_agent(
         run_id = uuid.uuid1()
 
         # Save training performance.
-        train_dir = results_directory + "/Train/Xu"
+        if agent_type is None:
+            train_dir = results_directory + "/Train/Xu"
+        else:
+            train_dir = results_directory + f"/Train/{agent_type}"
         Path(train_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{train_dir}/{experiment_id}-{run}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
             json.dump(train_results, f, ensure_ascii=False, indent=4)
 
         # Save epoch-based evaluation performance.
-        # epoch_test_dir = results_directory + "/Epoch/Xu"
+        # if agent_type is None:
+        #     epoch_test_dir = results_directory + "/Epoch/Xu"
+        # else:
+        #     epoch_test_dir = results_directory + f"/Epoch/{agent_type}"
         # Path(epoch_test_dir).mkdir(parents=True, exist_ok=True)
         # with open(f"{epoch_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
         #     json.dump(epoch_test_results, f, ensure_ascii=False, indent=4)
 
         # Save episode-based evaluation performance.
-        episode_test_dir = results_directory + "/Episode/Xu"
+        if agent_type is None:
+            episode_test_dir = results_directory + "/Episode/Xu"
+        else:
+            episode_test_dir = results_directory + f"/Episode/{agent_type}"
         Path(episode_test_dir).mkdir(parents=True, exist_ok=True)
         with open(f"{episode_test_dir}/{experiment_id}-{run}-{run_id}.json", "w", encoding="utf-8") as f:
             json.dump(episode_test_results, f, ensure_ascii=False, indent=4)
