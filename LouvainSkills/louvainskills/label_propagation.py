@@ -2,7 +2,7 @@ import random
 import igraph as ig
 
 
-def apply_label_propagation(stg: ig.Graph):
+def apply_label_propagation(stg: ig.Graph, weights=None):
     """
     Takes an iGraph graph and applies the Label Propagation Algorithm (LPA) for graph
     clustering to it. Neighbouring clusters in the partition found using LPA are then
@@ -17,7 +17,7 @@ def apply_label_propagation(stg: ig.Graph):
     """
 
     # Find a partition using the Label Propagation Algorithm (LPA).
-    partition = stg.community_label_propagation(weights=None, initial=None, fixed=None)
+    partition = stg.community_label_propagation(weights=weights, initial=None, fixed=None)
 
     # stg.vs["cluster-0-original"] = copy.copy(partition.membership)
 
@@ -32,7 +32,6 @@ def apply_label_propagation(stg: ig.Graph):
         for edge in partition.cluster_graph().es:
             u, v = edge.source, edge.target
             if (u != v) and ((u, v) not in merges) and ((v, u) not in merges):
-
                 temp_membership = partition.membership
                 for node, _ in enumerate(stg.vs):
                     if temp_membership[node] == u:

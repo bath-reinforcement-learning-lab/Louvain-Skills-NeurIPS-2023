@@ -1,7 +1,7 @@
 import igraph as ig
 
 
-def apply_edge_betweenness(stg: ig.Graph):
+def apply_edge_betweenness(stg: ig.Graph, weights=None):
     """
     Takes an iGraph graph and applies the edge betweenness (Girvan-Newman) method for graph
     clustering to it. Each iteration, the edge with the highest edge betweenness is removed.
@@ -17,7 +17,7 @@ def apply_edge_betweenness(stg: ig.Graph):
         `List[igraph.Graph]` : A list containing a single graph, representing the aggregate graph formed by the found patition.
     """
 
-    dendrogram = stg.community_edge_betweenness(clusters=None, directed=True)
+    dendrogram = stg.community_edge_betweenness(clusters=None, directed=True, weights=weights)
     optimal_count = dendrogram.optimal_count
     partition = dendrogram.as_clustering(n=optimal_count)
 
