@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from simpleenvs.envs.hanoi import HanoiEnvironment
-from simpleenvs.envs.discrete_rooms import DiscreteXuFourRooms
+from simpleenvs.envs.discrete_rooms import XuFourRooms
 
 from louvainskills.louvain import apply_louvain
 from louvainskills.utils.graph_utils import convert_nx_to_ig
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     resolutions = list(np.logspace(start=-5, stop=2, base=10, num=20))
 
     env_names = ["rooms", "hanoi"]
-    rooms_results = get_cluster_sizes(DiscreteXuFourRooms, {}, num_repeats, resolutions)
+    rooms_results = get_cluster_sizes(XuFourRooms, {}, num_repeats, resolutions)
     hanoi_results = get_cluster_sizes(HanoiEnvironment, {"num_disks": 4, "num_poles": 3}, num_repeats, resolutions)
 
     num_curves = max([len(rooms_results), len(hanoi_results)])
@@ -120,7 +120,7 @@ if __name__ == "__main__":
             plt.xlabel("Resolution Parameter (ρ)")
             plt.ylabel("Mean No. of Nodes Per Cluster")
             plt.grid("both")
-            output_path = "./Experiments/Chapter 2 - Louvain Skills/Graph Plotting/Plotting/Resolution Ablation"
+            output_path = "./Experiments/Chapter 2 - Louvain Skills/Resolution Ablation/"
             Path(output_path).mkdir(parents=True, exist_ok=True)
             plt.legend()
             plt.show()

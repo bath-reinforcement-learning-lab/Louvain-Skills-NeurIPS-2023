@@ -32,7 +32,7 @@ for env in envs:
     results_dict = compute_statistics_for_directories(directories, labels)
 
     # Ensure the output directory exists.
-    OUTPUT_DIRECTORY = "./Experiments/Chapter 2 - Louvain Skills/Graph Plotting/Plotting/Resolution Ablation/"
+    OUTPUT_DIRECTORY = "./Experiments/Chapter 2 - Louvain Skills/Resolution Ablation/"
     Path(OUTPUT_DIRECTORY).mkdir(parents=True, exist_ok=True)
 
     # Save the results to a .json file. Pretty print.
