@@ -15,7 +15,6 @@ from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
 
 
 def generate_office_louvain_hierarchy(num_floors: int) -> nx.DiGraph:
-
     # Define office building with `num_floors` floors.
     office_gen = OfficeGenerator(num_floors=num_floors, elevator_location=(7, 7))
     office_building = office_gen.generate_office_building()
@@ -30,7 +29,10 @@ def generate_office_louvain_hierarchy(num_floors: int) -> nx.DiGraph:
     # Perform hierarchical graph clustering.
     resolution = 0.05
     stg_ig = apply_louvain(
-        stg_ig, resolution=resolution, first_levels_to_skip=0, return_aggregate_graphs=False  # , weights="weight"
+        stg_ig,
+        resolution=resolution,
+        first_levels_to_skip=0,
+        return_aggregate_graphs=False,  # , weights="weight"
     )
 
     stg = convert_ig_to_nx(stg_ig)
@@ -39,9 +41,8 @@ def generate_office_louvain_hierarchy(num_floors: int) -> nx.DiGraph:
 
 
 if __name__ == "__main__":
-
     NUM_THREADS = 10
-    RESULTS_DIR = "./Training Results/Scaling STGs/"
+    RESULTS_DIR = "./Training Results/Chapter 2/Scaling/Scaling STGs/"
 
     min_floors = 1
     max_floors = 800

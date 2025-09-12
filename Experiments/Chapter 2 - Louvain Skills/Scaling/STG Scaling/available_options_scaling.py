@@ -8,20 +8,20 @@ from louvainskills.utils.graph_utils import aggregate_graph_from_node_attribute
 
 if __name__ == "__main__":
     LEVELS_TO_SKIP = 1
-    RESULTS_DIR = "./Training Results/Scaling STGs/"
+    INPUT_DIR = "./Training Results/Chapter 2/Scaling/Scaling STGs/"
+    OUTPUT_DIR = "./Experiments/Chapter 2 - Louvain Skills/Scaling/STG Scaling/"
 
     print("Processing STGs...")
 
     points = []
-    for file in os.listdir(RESULTS_DIR):
-
+    for file in os.listdir(INPUT_DIR):
         # Skip non-graph files.
         if not file.endswith(".gexf"):
             continue
 
         # Read in graph file.
         print(file)
-        stg: nx.DiGraph = nx.read_gexf(f"{RESULTS_DIR}/{file}")
+        stg: nx.DiGraph = nx.read_gexf(f"{INPUT_DIR}/{file}")
 
         # Record the number of states.
         num_states = stg.number_of_nodes()
@@ -59,11 +59,8 @@ if __name__ == "__main__":
     ax.set_ylabel("Skills Available Per State")
     ax.grid(visible=True, which="major", axis="both", linestyle="-")
 
-    # Save plot.
-    fig.savefig(f"{RESULTS_DIR}/skill availability scaling.pdf", dpi=300, bbox_inches="tight", transparent=True)
-
     # Save points.
     print("Saving results...")
     results = {"STG Sizes": stg_sizes, "Available Skills": level_counts}
-    with open(f"{RESULTS_DIR}/skill availability.json", "w") as f:
+    with open(f"{OUTPUT_DIR}/skill availability_scaling.json", "w") as f:
         json.dump(results, f, indent=2)
