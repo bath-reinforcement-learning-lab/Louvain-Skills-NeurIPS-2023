@@ -3,8 +3,6 @@ import math
 import random
 
 import numpy as np
-import igraph as ig
-import networkx as nx
 
 from itertools import cycle
 from collections import defaultdict
@@ -14,8 +12,6 @@ from simpleoptions.environment import BaseEnvironment
 
 from louvainskills.options import LouvainOption
 from louvainskills.option_trainers import OptionTrainer
-from louvainskills.utils.graph_layouts import gridlayout
-from louvainskills.utils.graph_utils import get_all_neighbours
 
 
 class IncrementalLouvainOptionTrainer(OptionTrainer):

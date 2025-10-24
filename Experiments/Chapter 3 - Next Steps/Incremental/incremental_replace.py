@@ -26,7 +26,7 @@ from louvainskills.envs.discrete_gridworlds import DiscreteRameshMazeBLTR
 from incremental_option_trainers import IncrementalLouvainOptionTrainer
 
 
-class IncrementalLouvainAgent(OptionAgent):
+class IncrementalReplaceAgent(OptionAgent):
     def __init__(
         self,
         env: "BaseEnvironment",
@@ -113,7 +113,6 @@ class IncrementalLouvainAgent(OptionAgent):
 
             if render_interval > 0:
                 self.env.render()
-                time_since_last_render = 0
 
             while not terminal:
                 selected_option = self.select_action(state, self.executing_options)
@@ -356,7 +355,7 @@ if __name__ == "__main__":
             test_env = DiscreteRameshMazeBLTR()
 
             # Initialise our agent and train it for 100x100 time-steps.
-            agent = IncrementalLouvainAgent(
+            agent = IncrementalReplaceAgent(
                 env,
                 test_env=test_env,
                 epsilon=0.1,
