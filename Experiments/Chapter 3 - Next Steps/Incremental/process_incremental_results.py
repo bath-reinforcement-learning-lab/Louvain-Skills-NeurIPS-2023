@@ -4,10 +4,11 @@ from pathlib import Path
 from louvainskills.utils.summary_statistics import compute_statistics_for_directories
 
 directories = [
-    "./Training Results/Chapter 3/Incremental/Rooms/Episode/Primitive Agent",
-    "./Training Results/Chapter 3/Incremental/Rooms/Episode/Multi-Level Agent",
-    "./Training Results/Chapter 3/Incremental/Rooms/Episode/Replace",
-    "./Training Results/Chapter 3/Incremental/Rooms/Episode/Update",
+    "./Training Results/Chapter 3/Incremental/Rooms/Train/Primitive Agent",
+    "./Training Results/Chapter 3/Incremental/Rooms/Train/Multi-Level Agent",
+    "./Training Results/Chapter 3/Incremental/Rooms/Train/Replace",
+    "./Training Results/Chapter 3/Incremental/Rooms/Train/Update",
+    "./Training Results/Chapter 3/Incremental/Rooms/Train/Hybrid",
 ]
 
 labels = [
@@ -15,6 +16,7 @@ labels = [
     "louvain",
     "replace",
     "update",
+    "hybrid",
 ]
 
 # Compute summary statistics.

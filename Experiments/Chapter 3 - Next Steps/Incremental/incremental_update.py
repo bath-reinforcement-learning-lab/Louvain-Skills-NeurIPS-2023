@@ -364,7 +364,7 @@ if __name__ == "__main__":
     import traceback
 
     # Target number of successful runs.
-    target_successful_runs = 4
+    target_successful_runs = 10
 
     successful_runs = 0
     attempts = 0

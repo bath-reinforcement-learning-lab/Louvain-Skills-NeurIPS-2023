@@ -6,7 +6,7 @@ setwd(dirname(getActiveDocumentContext()$path))
 path <- getwd()
 options(digits = 3)
 dosave <- TRUE
-max_epoch <- 80
+max_epoch <- 100
 n_runs <- 50
 time_interval <- 1
 
@@ -53,12 +53,20 @@ cip_y_hybrid <- c(means_hybrid - sd_hybrid, rev(means_hybrid + sd_hybrid))
 #box()
 
 plot.new()
-plot.window(ylim = c(-1.0, 5.0), xlim = c(0, max_epoch))
-axis(1, at = c(0, 10, 20, 30, 40, 50, 60, 70, 80), labels = TRUE, cex.axis = 1.7)
+plot.window(ylim = c(-1.0, 4.5), xlim = c(0, max_epoch))
+axis(1, at = c(0, 25, 50, 75, 100), labels = TRUE, cex.axis = 1.7)
 axis(2, at = c(-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0), labels = TRUE, cex.axis = 1.7)
 title(xlab = "Epoch", cex.lab = 2.0)
-title(ylab = "Sum of Rewards", cex.lab = 2.0)
+title(ylab = "Sum of Rewards in Epoch", cex.lab = 2.0)
 box()
+
+# option retraining intervals
+abline(v = 100 / 100,  col = "#cccccc")
+abline(v = 500 / 100,  col = "#cccccc")
+abline(v = 1000 / 100,  col = "#cccccc")
+abline(v = 3000 / 100,  col = "#cccccc")
+abline(v = 5000 / 100,  col = "#cccccc")
+abline(v = 8000 / 100,  col = "#cccccc")
 
 polygon(cip_x, cip_y_prim, col = adjustcolor("grey30", alpha.f = 0.3), border = FALSE)
 polygon(cip_x, cip_y_hybrid, col = adjustcolor("orange", alpha.f = 0.3), border = FALSE)
