@@ -326,39 +326,80 @@ class IncrementalHybridAgent(OptionAgent):
 
     def _train_options_on_current_partitions(self, stg: nx.DiGraph) -> Tuple[nx.DiGraph, List[LouvainOption]]:
         """
-        Retrain options over current labels (directed), same logic as Update.
+        Retrain options over current labels — parity with IncrementalUpdateAgent.update_options:
+        for each level i present on the STG and each directed primitive edge (u -> v),
+        if cluster_i(u) != cluster_i(v), create a directed skill (i, cluster_i(u), cluster_i(v)).
         """
-        # Build aggregate edge sets per level from labels
-        level_keys = sorted(
-            {k for _, data in stg.nodes(data=True) for k in data if isinstance(k, str) and k.startswith("cluster-")},
-            key=lambda s: int(s.split("-")[1]),
-        )
-        if len(level_keys) < 2:
-            primitive_options = [PrimitiveOption(a, self.env) for a in self.env.get_action_space()]
-            return stg, primitive_options
+        # Primitive options for this environment.
+        primitive_options = [PrimitiveOption(a, self.env) for a in self.env.get_action_space()]
 
-        aggs: List[nx.DiGraph] = [nx.DiGraph()]  # placeholder for alignment
-        for L in range(1, len(level_keys)):
-            gL = nx.DiGraph()
-            lab = f"cluster-{L}"
-            gL.add_nodes_from(set(nx.get_node_attributes(stg, lab).values()))
+        # Determine the number of levels from present cluster-* labels (same as Update).
+        level_attrs = set()
+        for n in stg.nodes():
+            for att in stg.nodes[n].keys():
+                if isinstance(att, str) and att.startswith("cluster-"):
+                    level_attrs.add(att)
+        # No cluster labels yet → keep current options (don’t regress to primitives).
+        if not level_attrs:
+            return stg, list(self.env.get_option_space())
+
+        # Build a directed skill set per level from observed transitions (identical to Update).
+        max_level = max(int(k.split("-")[1]) for k in level_attrs)
+        skill_hierarchy: List[set] = []
+        for i in range(max_level + 1):
+            directed_skills = set()
             for u, v in stg.edges():
-                cu = stg.nodes[u].get(lab)
-                cv = stg.nodes[v].get(lab)
+                cu = stg.nodes[u].get(f"cluster-{i}")
+                cv = stg.nodes[v].get(f"cluster-{i}")
                 if cu is None or cv is None:
                     continue
                 if cu != cv:
-                    gL.add_edge(cu, cv)
-            aggs.append(gL)
+                    directed_skills.add((i, cu, cv))
+            skill_hierarchy.append(directed_skills)
 
-        skill_hierarchy = []
-        for i, agg in enumerate(aggs[1:]):
-            skill_hierarchy.append([])
-            for u, v in agg.edges():
-                if u != v:
-                    skill_hierarchy[i].append((i, u, v))
+        # Fresh copy of the environment for training options.
+        training_env = self.env.__class__()
+        training_env.reset()
 
-        return stg, self._train_louvain_options(stg, skill_hierarchy)
+        options: List[List[LouvainOption]] = []
+        option_trainer = IncrementalValueIterationOptionTrainer(
+            training_env,
+            stg,
+            gamma=self.vi_gamma,
+            theta=self.vi_theta,
+            num_rollouts=self.vi_num_rollouts,
+            deterministic=self.vi_deterministic,
+        )
+
+        for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc="Hierarchy Level"):
+            options.append([])
+
+            if level == 0:
+                training_env.set_options(copy.copy(primitive_options))
+            else:
+                training_env.set_options(copy.copy(options[level - 1]))
+
+            for i, src_cluster, dst_cluster in tqdm(hierarchy_level, desc="Training Skills"):
+                opt = LouvainOption(
+                    stg=stg,
+                    hierarchy_level=i,
+                    source_cluster=src_cluster,
+                    target_cluster=dst_cluster,
+                    can_leave_initiation_set=False,
+                )
+                if not opt.initiation_set:
+                    continue
+
+                policy = option_trainer.train_option_policy(opt, can_leave_initiation_set=False)
+                if not policy:
+                    continue
+
+                opt.policy_dict = policy
+                options[level].append(opt)
+
+        flat_options = [o for lvl in options for o in lvl]
+        flat_options.extend(primitive_options)
+        return stg, flat_options
 
     def _train_louvain_options(
         self, stg: nx.DiGraph, skill_hierarchy: List[List[Tuple[int, int, int]]]
@@ -469,7 +510,7 @@ if __name__ == "__main__":
                 vi_gamma=0.99,
                 vi_num_rollouts=1,
                 vi_deterministic=True,
-                replace_drop_threshold=-100.0,
+                replace_drop_threshold=0.05,
             )
 
             train_results, test_results = agent.run_agent(
