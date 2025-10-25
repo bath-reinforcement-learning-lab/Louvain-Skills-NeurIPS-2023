@@ -1,17 +1,15 @@
+# hybrid_agent.py (parity with Replace/Update)
+
 import gc
 import copy
 import uuid
 import json
 import random
-
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
-import numpy as np
-import igraph as ig
 import networkx as nx
 import networkx.algorithms.community as nx_comm
-
 from tqdm import tqdm
 
 from simpleoptions import PrimitiveOption, OptionAgent
@@ -19,14 +17,50 @@ from simpleoptions.environment import BaseEnvironment
 from simpleoptions.option import BaseOption
 
 from louvainskills.louvain import apply_louvain
+from louvainskills.incremental_louvain import apply_incremental_louvain
 from louvainskills.options import LouvainOption
 from louvainskills.utils.graph_utils import convert_nx_to_ig, convert_ig_to_nx
-from louvainskills.envs.discrete_gridworlds import DiscreteRameshMazeBLTR
+from louvainskills.incremental_option_trainers import IncrementalValueIterationOptionTrainer
 
-from incremental_option_trainers import IncrementalLouvainOptionTrainer
+from simpleenvs.envs.discrete_rooms import XuFourRooms
+
+
+def compute_top_level_modularity(stg: nx.DiGraph) -> float:
+    """
+    Compute modularity for the highest 'cluster-*' level found on the STG.
+    Tries to compute on the directed STG (matching your current pipeline).
+    Falls back to an undirected view only if NetworkX complains.
+    """
+    if stg.number_of_nodes() == 0:
+        return 0.0
+
+    level_keys = {k for _, d in stg.nodes(data=True) for k in d if isinstance(k, str) and k.startswith("cluster-")}
+    if not level_keys:
+        return 0.0
+
+    top_key = max(level_keys, key=lambda s: int(s.split("-")[1]))
+
+    by_cluster = {}
+    for n, d in stg.nodes(data=True):
+        if top_key in d:
+            by_cluster.setdefault(d[top_key], []).append(n)
+
+    communities = [nodes for nodes in by_cluster.values() if nodes]
+    if len(communities) <= 1:
+        return 0.0
+
+    try:
+        return nx_comm.modularity(stg, communities, weight=None)
+    except Exception:
+        return nx_comm.modularity(stg.to_undirected(), communities, weight=None)
 
 
 class IncrementalHybridAgent(OptionAgent):
+    """
+    Hybrid = Incremental Update most of the time, but if top-level modularity
+    drops more than a threshold vs. the best since last Replace, rebuild from scratch.
+    """
+
     def __init__(
         self,
         env: "BaseEnvironment",
@@ -35,13 +69,27 @@ class IncrementalHybridAgent(OptionAgent):
         macro_alpha: float = 0.2,
         intra_option_alpha: float = 0.2,
         gamma: float = 1.0,
-        default_action_value: float = 0.0,
-        n_step_updates: bool = False,
-        replace_frequency: int = 2500,
+        default_action_value=0.0,
+        n_step_updates=False,
+        *,
+        vi_theta: float = 1e-8,
+        vi_gamma: float = 1.0,
+        vi_num_rollouts: int | None = None,
+        vi_deterministic: bool = True,
+        replace_drop_threshold: float = 0.05,
     ):
         super().__init__(
             env, test_env, epsilon, macro_alpha, intra_option_alpha, gamma, default_action_value, n_step_updates
         )
+        self.vi_theta = vi_theta
+        self.vi_gamma = vi_gamma
+        self.vi_num_rollouts = vi_num_rollouts
+        self.vi_deterministic = vi_deterministic
+
+        self.replace_drop_threshold = replace_drop_threshold
+
+        self._first_update = True
+        self._best_top_mod_since_replace: float = 0.0
 
     def run_agent(
         self,
@@ -53,61 +101,34 @@ class IncrementalHybridAgent(OptionAgent):
         test_length: int = 0,
         test_runs: int = 10,
         verbose_logging: bool = True,
-    ) -> List[float]:
-        """
-        Trains the agent for a given number of episodes.
-
-        Args:
-            num_epochs (int): The number of epochs to train the agent for.
-            epoch_length (int): How many time-steps each epoch should last for.
-            process_new_nodes_intervals (List[int]): The time-steps at which the agent should add new nodes to the STG, assign them clusters, and re-define the skill hierarchy.
-            render_interval (int, optional): How often (in time-steps) to call the environement's render function, in time-steps. Zero by default, disabling rendering.
-            test_interval (int, optional): How often (in epochs) to evaluate the greedy policy learned by the agent. Zero by default, in which case training performance is returned.
-            test_length (int, optional): How long (in time-steps) to test the agent for. Zero by default, in which case the agent is tested for one epoch.
-            test_runs (int, optional): How many test runs to perform each test_interval.
-            verbose_logging (bool, optional): Whether to log all information about each time-step, instead of just rewards. Defaults to True.
-
-        Returns:
-            List[float]: A list containing floats representing the rewards earned by the agent each time-step.
-        """
-        # Set the time-step limit.
+    ):
         num_time_steps = num_epochs * epoch_length
-
-        # If we are testing the greedy policy separately, make a separate copy of
-        # the environment to use for those tests. Also initialise variables for
-        # tracking test performance.
         training_rewards = [None for _ in range(num_time_steps)]
 
         if test_interval > 0:
             test_interval_time_steps = test_interval * epoch_length
-            evaluation_rewards = [None for _ in range(num_time_steps // test_interval_time_steps)]
-
-            # Check that a test environment has been provided - if not, raise an error.
+            episodic_evaluation_rewards = [None for _ in range(num_time_steps // test_interval_time_steps)]
             if self.test_env is None:
                 raise RuntimeError("No test_env has been provided specified.")
         else:
-            evaluation_rewards = []
+            episodic_evaluation_rewards = []
 
-        # Set the environment's option set to be the set of primitive options.
-        options = []
-        for action in self.env.get_action_space():
-            options.append(PrimitiveOption(action, self.env))
+        # primitives only to start
+        options = [PrimitiveOption(a, self.env) for a in self.env.get_action_space()]
         self.env.set_options(options)
-        self.test_env.set_options(options)
+        if self.test_env is not None:
+            self.test_env.set_options(options)
+
+        stg = nx.DiGraph()
+        new_nodes: List = []
 
         episode = 0
         time_steps = 0
 
-        stg = nx.DiGraph()
-        new_nodes = []
-
         while time_steps < num_time_steps:
-            # Initialise initial state variables.
             state = self.env.reset()
             terminal = False
 
-            # If this initial state has not been seen before,
-            # add it to the STG and record it as a new node.
             if not stg.has_node(state):
                 stg.add_node(state)
                 new_nodes.append(state)
@@ -118,18 +139,14 @@ class IncrementalHybridAgent(OptionAgent):
             while not terminal:
                 selected_option = self.select_action(state, self.executing_options)
 
-                # Handle if the selected option is a higher-level option.
                 if isinstance(selected_option, BaseOption):
                     self.executing_options.append(copy.copy(selected_option))
                     self.executing_options_states.append([state])
                     self.executing_options_rewards.append([])
-
-                # Handle if the selected option is a primitive action.
                 else:
                     time_steps += 1
                     next_state, reward, terminal, __ = self.env.step(selected_option)
 
-                    # Logging
                     training_rewards[time_steps - 1] = reward
                     if verbose_logging:
                         transition = {
@@ -137,16 +154,14 @@ class IncrementalHybridAgent(OptionAgent):
                             "next_state": next_state,
                             "reward": reward,
                             "terminal": terminal,
-                            "active_options": [str(option) for option in self.executing_options],
+                            "active_options": [str(o) for o in self.executing_options],
                         }
-                        for key, value in transition.items():
-                            self.training_log[key].append(value)
+                        for k, v in transition.items():
+                            self.training_log[k].append(v)
 
-                    # Render, if we need to.
                     if render_interval > 0 and time_steps % render_interval == 0:
                         self.env.render()
 
-                    # Record newly-seen states and transitions.
                     if not stg.has_node(next_state):
                         stg.add_node(next_state)
                         new_nodes.append(next_state)
@@ -155,50 +170,70 @@ class IncrementalHybridAgent(OptionAgent):
 
                     state = next_state
 
-                    # If this is a time-step when we should be processing new nodes,
-                    # process them and update the skill hierarchy.
+                    # scheduled updates
                     if time_steps in process_new_nodes_intervals:
-                        print(f"Time-Step {time_steps}/{num_time_steps}.")
+                        print(f"Decision Stage {time_steps}/{num_time_steps}.")
                         if len(new_nodes) > 0:
-                            print("Updating STG and Skill Hierarchy...")
-                            print(f"{len(new_nodes)} New Nodes Found: {new_nodes}")
-                            stg, options = self.update_options(stg)
-                            self.env.set_options(options)
-                            self.test_env.set_options(options)
+                            if self._first_update:
+                                # first update: full replace
+                                stg, options = self._rebuild_full_hierarchy(stg)  # resolution=1.0 (parity)
+                                self.env.set_options(options)
+                                if self.test_env is not None:
+                                    self.test_env.set_options(options)
+                                self.purge_all_non_primitives()
+                                self._first_update = False
+                                self._best_top_mod_since_replace = compute_top_level_modularity(stg)
+                                print(
+                                    f"[Hybrid] Full replace (initial). Top-level modularity = "
+                                    f"{self._best_top_mod_since_replace:.6f}"
+                                )
+                                new_nodes = []
+                            else:
+                                # incremental update first
+                                print("Updating partitions incrementally...")
+                                stg = apply_incremental_louvain(stg, new_nodes)
+                                new_nodes = []
+                                current_mod = compute_top_level_modularity(stg)
+                                self._best_top_mod_since_replace = max(self._best_top_mod_since_replace, current_mod)
+                                print(
+                                    f"[Hybrid] Incremental update: top-level modularity = {current_mod:.6f} "
+                                    f"(best since replace = {self._best_top_mod_since_replace:.6f})"
+                                )
 
-                            self.purge_old_q_table()
-                            new_nodes = []
-                            print("Updated STG and Skill Hierarchy!")
+                                # gate: if drop beyond threshold, full replace
+                                if current_mod < (self._best_top_mod_since_replace - self.replace_drop_threshold):
+                                    print("[Hybrid] Modularity drop beyond threshold → full replace.")
+                                    stg, options = self._rebuild_full_hierarchy(stg)  # resolution=1.0 (parity)
+                                    self.env.set_options(options)
+                                    if self.test_env is not None:
+                                        self.test_env.set_options(options)
+                                    self.purge_all_non_primitives()
+                                    self._best_top_mod_since_replace = compute_top_level_modularity(stg)
+                                    print(
+                                        f"[Hybrid] Full replace done. Top-level modularity = "
+                                        f"{self._best_top_mod_since_replace:.6f}"
+                                    )
+                                else:
+                                    # otherwise, just retrain options on current partitions
+                                    stg, options = self._train_options_on_current_partitions(stg)
+                                    self.env.set_options(options)
+                                    if self.test_env is not None:
+                                        self.test_env.set_options(options)
+                                    self.purge_obsolete_q_table()
+                                    print("[Hybrid] Retrained options on updated partitions.")
 
-                        # gridlayout(stg)
-                        # nx.write_gexf(
-                        #     stg,
-                        #     f"Incremental Agent - FourRooms - {len(stg.nodes)} Nodes - {time_steps} Decision Stages.gexf",
-                        #     prettyprint=True,
-                        # )
-
-                        # Write graph to file for inspection.
-                        # gridlayout(stg)
-                        # nx.write_gexf(
-                        #     stg,
-                        #     f"Incremental Agent - FourRooms - {len(stg.nodes)} Nodes - {time_steps} Decision Stages.gexf",
-                        #     prettyprint=True,
-                        # )
-
+                    # option termination + learning
                     for i in range(len(self.executing_options)):
                         self.executing_options_states[i].append(next_state)
                         self.executing_options_rewards[i].append(reward)
 
-                    # Terminate any options which need terminating this time-step.
                     while self.executing_options and self._roll_termination(self.executing_options[-1], next_state):
-                        # Perform a macro-q learning update for the terminating option.
                         self.macro_q_learn(
                             self.executing_options_states[-1],
                             self.executing_options_rewards[-1],
                             self.executing_options[-1],
                             self.n_step_updates,
                         )
-                        # Perform an intra-option learning update for the terminating option.
                         self.intra_option_learn(
                             self.executing_options_states[-1],
                             self.executing_options_rewards[-1],
@@ -210,32 +245,28 @@ class IncrementalHybridAgent(OptionAgent):
                         self.executing_options_rewards.pop()
                         self.executing_options.pop()
 
-                    # If we are testing the greedy policy learned by the agent separately,
-                    # and it is time to test it, then test it.
+                    # episodic evaluation
                     if test_interval > 0 and time_steps % test_interval_time_steps == 0:
-                        evaluation_rewards[(time_steps - 1) // test_interval_time_steps] = self.test_policy(
-                            test_length,
-                            test_runs,
-                            time_steps // test_interval_time_steps,
+                        episodic_evaluation_rewards[(time_steps - 1) // test_interval_time_steps] = self.test_policy(
+                            test_length=test_length,
+                            test_runs=test_runs,
+                            eval_number=time_steps // test_interval_time_steps,
                             allow_exploration=False,
                             verbose_logging=verbose_logging,
+                            episodic_eval=True,
                         )
 
-                # If we have been training for more than the desired number of time-steps, terminate.
                 if time_steps >= num_time_steps:
                     terminal = True
 
-                # Handle if the current state is terminal.
                 if terminal:
                     while len(self.executing_options) > 0:
-                        # Perform a macro-q learning update for the topmost option.
                         self.macro_q_learn(
                             self.executing_options_states[-1],
                             self.executing_options_rewards[-1],
                             self.executing_options[-1],
                             self.n_step_updates,
                         )
-                        # Perform an intra-option learning update for the topmost option.
                         self.intra_option_learn(
                             self.executing_options_states[-1],
                             self.executing_options_rewards[-1],
@@ -248,114 +279,184 @@ class IncrementalHybridAgent(OptionAgent):
                         self.executing_options.pop()
 
             episode += 1
+
         gc.collect()
 
         if verbose_logging:
             training_log = self.training_log
-            evaluation_log = self.evaluation_log if self.evaluation_log else None
+            evaluation_log = self.episodic_evaluation_log if self.episodic_evaluation_log else None
             return training_log, evaluation_log
         else:
             training_log = [sum(training_rewards[i * epoch_length : (i + 1) * epoch_length]) for i in range(num_epochs)]
-            evaluation_log = evaluation_rewards if evaluation_rewards else None
-            return training_log, evaluation_log
+            return training_log, (episodic_evaluation_rewards if episodic_evaluation_rewards else None)
 
-    def update_options(self, original_stg: nx.DiGraph):
-        # Create a fresh copy of the STG, without any node attributes.
+    # ───────── helpers ─────────
+
+    def _rebuild_full_hierarchy(self, original_stg: nx.DiGraph) -> Tuple[nx.DiGraph, List[LouvainOption]]:
+        """
+        Full Replace, parity with your Replace agent: resolution=1.0
+        """
         stg = nx.DiGraph()
         stg.add_nodes_from(original_stg.nodes)
         stg.add_edges_from(original_stg.edges)
 
-        # Re-run the Louvain algorithm from scratch.
         stg_ig = convert_nx_to_ig(stg)
-        stg_ig, aggs_ig = apply_louvain(stg_ig, resolution=0.05, return_aggregate_graphs=True, first_levels_to_skip=1)
+        stg_ig, aggs_ig = apply_louvain(
+            stg_ig,
+            resolution=1.0,
+            return_aggregate_graphs=True,
+            first_levels_to_skip=1,  # PARITY LINE
+        )
         stg = convert_ig_to_nx(stg_ig)
-        aggs = []
-        for i, agg_ig in enumerate(aggs_ig):
-            agg = convert_ig_to_nx(agg_ig)
 
+        aggs = []
+        for agg_ig in aggs_ig:
+            agg = convert_ig_to_nx(agg_ig)
             if agg.number_of_nodes() > 1:
                 aggs.append(copy.deepcopy(agg))
 
-        # Extract skill hierarchy from the STG.
         skill_hierarchy = []
         for i, agg in enumerate(aggs[1:]):
             skill_hierarchy.append([])
-            for u, v in agg.to_undirected().edges():
+            for u, v in agg.edges():
                 if u != v:
                     skill_hierarchy[i].append((i, u, v))
-                    skill_hierarchy[i].append((i, v, u))
 
-        # Define primitive actions.
-        primitive_options = []
-        for action in self.env.get_action_space():
-            primitive_options.append(PrimitiveOption(action, self.env))
+        return stg, self._train_louvain_options(stg, skill_hierarchy)
 
-        # Instantiate training environment.
+    def _train_options_on_current_partitions(self, stg: nx.DiGraph) -> Tuple[nx.DiGraph, List[LouvainOption]]:
+        """
+        Retrain options over current labels (directed), same logic as Update.
+        """
+        # Build aggregate edge sets per level from labels
+        level_keys = sorted(
+            {k for _, data in stg.nodes(data=True) for k in data if isinstance(k, str) and k.startswith("cluster-")},
+            key=lambda s: int(s.split("-")[1]),
+        )
+        if len(level_keys) < 2:
+            primitive_options = [PrimitiveOption(a, self.env) for a in self.env.get_action_space()]
+            return stg, primitive_options
+
+        aggs: List[nx.DiGraph] = [nx.DiGraph()]  # placeholder for alignment
+        for L in range(1, len(level_keys)):
+            gL = nx.DiGraph()
+            lab = f"cluster-{L}"
+            gL.add_nodes_from(set(nx.get_node_attributes(stg, lab).values()))
+            for u, v in stg.edges():
+                cu = stg.nodes[u].get(lab)
+                cv = stg.nodes[v].get(lab)
+                if cu is None or cv is None:
+                    continue
+                if cu != cv:
+                    gL.add_edge(cu, cv)
+            aggs.append(gL)
+
+        skill_hierarchy = []
+        for i, agg in enumerate(aggs[1:]):
+            skill_hierarchy.append([])
+            for u, v in agg.edges():
+                if u != v:
+                    skill_hierarchy[i].append((i, u, v))
+
+        return stg, self._train_louvain_options(stg, skill_hierarchy)
+
+    def _train_louvain_options(
+        self, stg: nx.DiGraph, skill_hierarchy: List[List[Tuple[int, int, int]]]
+    ) -> List[LouvainOption]:
+        primitive_options = [PrimitiveOption(a, self.env) for a in self.env.get_action_space()]
+
         training_env = self.env.__class__()
         training_env.reset()
 
-        # Train Louvain options.
-        options = []
-        option_trainer = IncrementalLouvainOptionTrainer(
+        options: List[List[LouvainOption]] = []
+        option_trainer = IncrementalValueIterationOptionTrainer(
             training_env,
             stg,
-            n_episodes=10000,
-            max_episode_length=200,
-            can_leave_initiation_set=False,
+            gamma=self.vi_gamma,
+            theta=self.vi_theta,
+            num_rollouts=self.vi_num_rollouts,
+            deterministic=self.vi_deterministic,
         )
-        for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc="Hierachy Level"):
+
+        for level, hierarchy_level in tqdm(enumerate(skill_hierarchy), desc="Hierarchy Level"):
             options.append([])
 
-            # Set available options to options from the previous level of the hierarchy.
             if level == 0:
-                training_env.options = copy.copy(primitive_options)
+                training_env.set_options(copy.copy(primitive_options))
             else:
-                training_env.options = copy.copy(options[level - 1])
+                training_env.set_options(copy.copy(options[level - 1]))
 
-            # Train this level of the hierarchy.
             for i, u, v in tqdm(hierarchy_level, desc="Training Skills"):
-                # Train skills at this level of the hierarchy.
-                options[level].append(
-                    LouvainOption(training_env, stg, i, u, v, False, option_trainer.train_option_policy(i, u, v))
+                option = LouvainOption(
+                    stg=stg,
+                    hierarchy_level=i,
+                    source_cluster=u,
+                    target_cluster=v,
+                    can_leave_initiation_set=False,
                 )
+                if not option.initiation_set:
+                    continue
 
-        options = [option for level in options for option in level]
-        options.extend(primitive_options)
+                policy = option_trainer.train_option_policy(option, can_leave_initiation_set=False)
+                if not policy:
+                    continue
 
-        # Return the updated STG and options.
-        return stg, options
+                option.policy_dict = policy
+                options[level].append(option)
 
-    def purge_old_q_table(self):
-        primitive_hashes = []
-        for action in self.env.get_action_space():
-            primitive_hashes.append(hash(PrimitiveOption(action, self.env)))
+        flat = [o for lvl in options for o in lvl]
+        flat.extend(primitive_options)
+        return flat
+
+    def purge_all_non_primitives(self):
+        """
+        Use only after a full Replace. Keeps primitives, drops all learned options.
+        """
+        primitive_hashes = [hash(PrimitiveOption(a, self.env)) for a in self.env.get_action_space()]
+        keys_to_del = []
+        for state_hash, action_hash in list(self.q_table.keys()):
+            if action_hash not in primitive_hashes:
+                keys_to_del.append((state_hash, action_hash))
+        for k in keys_to_del:
+            del self.q_table[k]
+
+    def purge_obsolete_q_table(self):
+        """
+        Use after incremental updates. Keep primitives and any option that still exists.
+        Delete only entries tied to options that are no longer present.
+        """
+        primitive_hashes = [hash(PrimitiveOption(a, self.env)) for a in self.env.get_action_space()]
+        current_option_hashes = set(hash(o) for o in self.env.get_option_space())
 
         keys_to_del = []
-        for key in self.q_table.keys():
-            state_hash, action_hash = key
-            if action_hash not in primitive_hashes:
-                keys_to_del.append(key)
+        for state_hash, action_hash in list(self.q_table.keys()):
+            # Drop if it's neither a primitive nor a still-present option.
+            if (action_hash not in primitive_hashes) and (action_hash not in current_option_hashes):
+                keys_to_del.append((state_hash, action_hash))
+        for k in keys_to_del:
+            del self.q_table[k]
 
-        for key in keys_to_del:
-            del self.q_table[key]
 
-
+# Runner (keep-until-success style, like Replace/Update)
 if __name__ == "__main__":
-    num_runs = 40
-    for run in range(num_runs):
+    import traceback
+
+    target_successful_runs = 10
+    successful_runs = 0
+    attempts = 0
+
+    out_ep = "./Training Results/Chapter 3/Incremental/Rooms/Episode/Hybrid/"
+    out_train = "./Training Results/Chapter 3/Incremental/Rooms/Train/Hybrid/"
+
+    while successful_runs < target_successful_runs:
+        attempts += 1
+        print(f"\n[Hybrid] Attempt {attempts} (successful so far: {successful_runs}/{target_successful_runs})...")
         try:
-            env_name = "Maze"
-            output_directory = "./Training Results/Rooms/Incremental Replace/"
-            output_directory_training = "./Training Results/Rooms/Incremental Replace Training/"
             experiment_id = random.randrange(10000)
-            num_agents = 1
 
-            # Run Macro-Q Learning Agent
-            # Initialise our environment.
-            env = DiscreteRameshMazeBLTR()
-            test_env = DiscreteRameshMazeBLTR()
+            env = XuFourRooms(movement_penalty=-0.01, goal_reward=1.0)
+            test_env = XuFourRooms(movement_penalty=-0.01, goal_reward=1.0)
 
-            # Initialise our agent and train it for 100x100 time-steps.
             agent = IncrementalHybridAgent(
                 env,
                 test_env=test_env,
@@ -363,30 +464,46 @@ if __name__ == "__main__":
                 macro_alpha=0.4,
                 intra_option_alpha=0.4,
                 gamma=1.0,
-                n_step_updates=False,
+                n_step_updates=True,
+                vi_theta=1e-5,
+                vi_gamma=0.99,
+                vi_num_rollouts=1,
+                vi_deterministic=True,
+                replace_drop_threshold=-100.0,
             )
 
             train_results, test_results = agent.run_agent(
                 num_epochs=100,
-                epoch_length=750,
-                process_new_nodes_intervals=[500, 2000, 5000, 15000, 30000, 60000],
+                epoch_length=100,
+                process_new_nodes_intervals=[100, 500, 1000, 3000, 5000, 8000],
                 test_interval=1,
-                test_length=100,
+                test_length=40,
                 test_runs=5,
                 verbose_logging=False,
             )
 
             gc.collect()
 
-            # Write testing results to output file.
-            Path(output_directory).mkdir(parents=True, exist_ok=True)
-            with open(f"{output_directory}/{experiment_id}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+            Path(out_ep).mkdir(parents=True, exist_ok=True)
+            with open(f"{out_ep}/{experiment_id}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
                 json.dump(test_results, f, ensure_ascii=False, indent=4)
 
-            # Write training results to output file.
-            Path(output_directory_training).mkdir(parents=True, exist_ok=True)
-            with open(f"{output_directory_training}/{experiment_id}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
+            Path(out_train).mkdir(parents=True, exist_ok=True)
+            with open(f"{out_train}/{experiment_id}-{uuid.uuid1()}.json", "w", encoding="utf-8") as f:
                 json.dump(train_results, f, ensure_ascii=False, indent=4)
 
-        except:
+            successful_runs += 1
+            print(f"[Hybrid] Run {successful_runs} of {target_successful_runs} completed successfully.")
+
+        except KeyboardInterrupt:
+            print("\nInterrupted by user. Exiting.")
+            break
+
+        except Exception as e:
+            print(f"[Hybrid] Attempt {attempts} failed with an exception. Skipping this run.")
+            print(f"Reason: {e}")
+            traceback.print_exc()
+            gc.collect()
             continue
+
+    print(f"\n[Hybrid] Finished. Successful runs: {successful_runs}/{target_successful_runs}.")
